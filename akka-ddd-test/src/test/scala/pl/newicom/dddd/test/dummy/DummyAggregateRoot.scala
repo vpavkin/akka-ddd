@@ -40,7 +40,7 @@ object DummyAggregateRoot {
 
   case class CandidateValue(value: Int, confirmationToken: UUID)
 
-  case class DummyState(value: Int, candidateValue: Option[CandidateValue] = None) extends AggregateState {
+  case class DummyState(value: Int, candidateValue: Option[CandidateValue] = None) extends AggregateState[DummyState] {
     override def apply = {
       case ValueChanged(_, newValue, _) =>
         copy(value = newValue, candidateValue = None)
