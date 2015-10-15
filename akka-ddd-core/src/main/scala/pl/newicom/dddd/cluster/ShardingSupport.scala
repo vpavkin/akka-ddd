@@ -35,7 +35,7 @@ trait ShardingSupport {
       private def startSharding(shardSettings: ClusterShardingSettings): Unit = {
         val entityFactory = implicitly[BusinessEntityActorFactory[A]]
         val entityProps = entityFactory.props(new PassivationConfig(Passivate(PoisonPill), entityFactory.inactivityTimeout))
-        val entityClass = implicitly[ClassTag[A]].runtimeClass.asInstanceOf[Class[A]]
+        val entityClass = implicitly[ClassTag[A]].runtimeClass
         val sr = implicitly[ShardResolution[A]]
 
         ClusterSharding(system).start(
