@@ -5,7 +5,7 @@ import java.net.URL
 
 name := "akka-ddd"
 
-version in ThisBuild := "1.0.5"
+version in ThisBuild := "1.0.8-SNAPSHOT"
 organization in ThisBuild := "pl.newicom.dddd"
 scalaVersion in ThisBuild := "2.11.7"
 
@@ -61,7 +61,7 @@ lazy val `view-update-sql` = project
   .configs(IntegrationTest)
   .settings(
     commonSettings,
-    scalacOptions ++= Seq("-language:existentials"),
+    scalacOptions ++= Seq("-language:existentials", "-language:implicitConversions"),
     inConfig(IntegrationTest)(Defaults.testTasks),
     testOptions       in Test            := Seq(Tests.Filter(specFilter)),
     testOptions       in IntegrationTest := Seq(Tests.Filter(integrationFilter)),

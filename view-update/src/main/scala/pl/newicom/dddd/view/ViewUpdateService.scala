@@ -14,18 +14,19 @@ object ViewUpdateService {
 
 abstract class ViewUpdateService extends Actor with ActorLogging {
 
-  import context.dispatcher
-
   type Configuration <: ViewUpdateConfig
+
+  implicit val ec: ExecutionContext = context.dispatcher
 
   def configuration: Seq[Configuration]
 
   def viewHandler(config: Configuration): ViewHandler
 
-  def ensureViewStoreAvailable(implicit ec: ExecutionContext): Future[Unit]
+  def ensureViewStoreAvailable: Future[Unit]
 
-  def onUpdateStart(): Unit = {
+  def onUpdateStart: Future[Unit] = {
     // override
+    Future.successful(())
   }
   
   /**
@@ -47,9 +48,10 @@ abstract class ViewUpdateService extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case Start(esConn) =>
-      onUpdateStart()
-      configuration.foreach {
-        config => context.actorOf(ViewUpdater.props(esConn, config.officeInfo, viewHandler(config)))
+      onUpdateStart.onSuccess {
+        case _ => configuration.foreach {
+            config => context.actorOf(ViewUpdater.props(esConn, config.officeInfo, viewHandler(config)))
+        }
       }
     case EnsureViewStoreAvailable =>
       import akka.pattern.pipe
