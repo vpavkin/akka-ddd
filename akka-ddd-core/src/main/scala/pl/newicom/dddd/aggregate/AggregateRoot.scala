@@ -22,14 +22,13 @@ abstract class AggregateRootActorFactory[A <: AggregateRoot[_]] extends Business
   def inactivityTimeout: Duration = 1.minute
 }
 
-trait AggregateRoot[S <: AggregateState[S]]
+abstract class AggregateRoot[S <: AggregateState[S]]
   extends BusinessEntity with GracefulPassivation with PersistentActor
   with EventHandler with Deduplication with ActorLogging {
 
   type AggregateRootFactory = PartialFunction[DomainEvent, S]
   private var stateOpt: Option[S] = None
   private var _lastCommandMessage: Option[CommandMessage] = None
-  private var _sender: ActorRef = null
   val factory: AggregateRootFactory
 
   override def persistenceId: String = id
@@ -42,13 +41,11 @@ trait AggregateRoot[S <: AggregateState[S]]
     case cm: CommandMessage =>
       log.debug(s"Received: $cm")
       _lastCommandMessage = Some(cm)
-      _sender = sender()
       handleCommand.applyOrElse(cm.command, unhandled)
   }
 
-  override def receiveRecover: Receive = {
-    case em: EventMessage =>
-      updateState(em)
+  override def receiveRecover = {
+    case em: EventMessage => updateState(em)
   }
 
   override def preRestart(reason: Throwable, msgOpt: Option[Any]) {
@@ -63,6 +60,15 @@ trait AggregateRoot[S <: AggregateState[S]]
 
   def handleCommand: Receive
 
+
+  def raise(event: DomainEvent) {
+    persist(new EventMessage(event).causedBy(commandMessage)) { persisted =>
+      log.info("Event persisted: {}", event)
+      updateState(persisted)
+      handle(sender(), toDomainEventMessage(persisted))
+    }
+  }
+
   def updateState(em: EventMessage) {
     val event = em.event
     val nextState = if (initialized) state.apply(event) else factory.apply(event)
@@ -70,18 +76,7 @@ trait AggregateRoot[S <: AggregateState[S]]
     messageProcessed(em)
   }
 
-  def raise(event: DomainEvent) {
-    persist(new EventMessage(event).causedBy(commandMessage)) {
-      persisted =>
-        {
-          log.info("Event persisted: {}", event)
-          updateState(persisted)
-          handle(_sender, toDomainEventMessage(persisted))
-        }
-    }
-  }
-
-  def toDomainEventMessage(persisted: EventMessage) =
+  def toDomainEventMessage(persisted: EventMessage): DomainEventMessage =
     new DomainEventMessage(persisted, AggregateSnapshotId(id, lastSequenceNr))
       .withMetaData(persisted.metadata)
 
@@ -100,7 +95,7 @@ trait AggregateRoot[S <: AggregateState[S]]
 
   def acknowledgeCommandProcessed(msg: Message, result: Try[Any] = Success("OK")) {
     val deliveryReceipt = msg.deliveryReceipt(result)
-    _sender ! deliveryReceipt
+    sender() ! deliveryReceipt
     log.debug(s"Delivery receipt (for received command) sent ($deliveryReceipt)")
   }
 
