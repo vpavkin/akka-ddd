@@ -27,7 +27,7 @@ object SqlViewUpdateServiceIntegrationSpec {
 
   implicit def dummyFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
     new AggregateRootActorFactory[DummyAggregateRoot] {
-      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher)
+      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 
@@ -58,13 +58,13 @@ class SqlViewUpdateServiceIntegrationSpec
       system.actorOf(Props(
         new SqlViewUpdateService with SqlViewStoreConfiguration {
           def config = SqlViewUpdateServiceIntegrationSpec.this.config
-          def vuConfigs = List(SqlViewUpdateConfig("test-view", dummyOffice, new Projection {
+          def vuConfigs = List(SqlViewUpdateConfig("test-view", dummyOffice, new Projection[DummyEvent] {
 
             def failIfRequired(msg: String) =
               if (shouldFail) failed(new RuntimeException(msg)) else successful(())
 
-            def consume(em: DomainEventMessage): ProjectionAction[All] = {
-              val event = em.event.asInstanceOf[DummyEvent]
+            def consume(em: DomainEventMessage[DummyEvent]): ProjectionAction[All] = {
+              val event = em.event
               val ignore = !aggregateId.equals(event.id)
               if (ignore)
                 successful(())

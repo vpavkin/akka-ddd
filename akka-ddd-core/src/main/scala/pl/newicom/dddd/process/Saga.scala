@@ -48,7 +48,7 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
 
   def sagaOffice: ActorPath = context.parent.path.parent
 
-  private var _lastEventMessage: Option[EventMessage] = None
+  private var _lastEventMessage: Option[EventMessage[DomainEvent]] = None
 
   /**
    * Event message being processed. Not available during recovery
@@ -101,7 +101,7 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
   /**
    * Triggers state transition
    */
-  def raise(em: EventMessage): Unit =
+  def raise(em: EventMessage[DomainEvent]): Unit =
     persist(em) { persisted =>
       log.debug("Event message persisted: {}", persisted)
       updateState(persisted)
@@ -114,7 +114,7 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
   def applyEvent: PartialFunction[DomainEvent, Unit]
 
   private def updateState(msg: Any): Unit = msg match {
-    case em: EventMessage =>
+    case em: EventMessage[_] =>
       messageProcessed(em)
       applyEvent.applyOrElse(em.event, (e: DomainEvent) => ())
     case receipt: Delivered =>
@@ -130,16 +130,16 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
   }
 
   def receiveUnexpected: Receive = {
-    case em: EventMessage => handleUnexpectedEvent(em)
+    case em: EventMessage[DomainEvent] => handleUnexpectedEvent(em)
   }
 
-  def handleUnexpectedEvent(em: EventMessage): Unit = {
+  def handleUnexpectedEvent(em: EventMessage[DomainEvent]): Unit = {
     log.warning(s"Unhandled: $em") // unhandled event should be redelivered by SagaManager
   }
 
   override def messageProcessed(m: Message): Unit = {
     _lastEventMessage = m match {
-      case em: EventMessage =>
+      case em: EventMessage[DomainEvent] =>
         Some(em)
       case _ => None
     }

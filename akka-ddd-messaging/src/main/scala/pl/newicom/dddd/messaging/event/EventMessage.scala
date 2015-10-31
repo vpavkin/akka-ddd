@@ -7,18 +7,18 @@ import pl.newicom.dddd.messaging.{EntityMessage, Message}
 import pl.newicom.dddd.utils.UUIDSupport._
 
 object EventMessage {
-  def unapply(em: EventMessage): Option[(String, DomainEvent)] = {
+  def unapply[E <: DomainEvent](em: EventMessage[E]): Option[(String, E)] = {
     Some(em.id, em.event)
   }
 }
 
-class EventMessage(
-    val event: DomainEvent,
+class EventMessage[+E <: DomainEvent](
+    val event: E,
     val id: String = uuid,
     val timestamp: DateTime = new DateTime)
   extends Message with EntityMessage {
 
-  type MessageImpl <: EventMessage
+  type MessageImpl <: EventMessage[E]
 
   override def entityId = tryGetMetaAttribute[String](CorrelationId).orNull
   override def payload = event

@@ -1,6 +1,7 @@
 package pl.newicom.dddd.messaging.event
 
 import akka.actor.{Actor, ActorRef}
+import pl.newicom.dddd.aggregate.DomainEvent
 import pl.newicom.dddd.messaging.MetaData
 
 trait EventStreamSubscriber {
@@ -18,11 +19,11 @@ trait EventStreamSubscriber {
    * Should call [[eventReceived]] with event message enriched with metadata obtained
    * from given metadata provider once the event is received from the stream.
    */
-  def receiveEvent(metaDataProvider: EventMessage => Option[MetaData]): Receive
+  def receiveEvent(metaDataProvider: EventMessage[DomainEvent] => Option[MetaData]): Receive
 
   /**
    * Called whenever event has been received from the stream.
    */
-  def eventReceived(em: EventMessage, position: Long): Unit
+  def eventReceived(em: EventMessage[DomainEvent], position: Long): Unit
 
 }

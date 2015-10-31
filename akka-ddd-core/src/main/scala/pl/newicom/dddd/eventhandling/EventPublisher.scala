@@ -1,14 +1,15 @@
 package pl.newicom.dddd.eventhandling
 
 import akka.actor.ActorRef
+import pl.newicom.dddd.aggregate.DomainEvent
 import pl.newicom.dddd.messaging.event.DomainEventMessage
 
-trait EventPublisher extends EventHandler {
+trait EventPublisher[E <: DomainEvent] extends EventHandler[E] {
 
-  override abstract def handle(senderRef: ActorRef, event: DomainEventMessage): Unit = {
+  override abstract def handle(senderRef: ActorRef, event: DomainEventMessage[E]): Unit = {
     publish(event)
     super.handle(senderRef, event)
   }
 
-  def publish(event: DomainEventMessage)
+  def publish(event: DomainEventMessage[E])
 }

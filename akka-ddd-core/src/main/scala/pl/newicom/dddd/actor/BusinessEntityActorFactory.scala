@@ -7,7 +7,7 @@ import scala.annotation.implicitNotFound
 import scala.concurrent.duration.Duration
 
 @implicitNotFound("could not find factory for ${A} \nsee: BusinessEntityActorFactory")
-abstract class BusinessEntityActorFactory[A <: BusinessEntity] {
+abstract class BusinessEntityActorFactory[A] {
   def props(pc: PassivationConfig): Props
   def inactivityTimeout: Duration
 }

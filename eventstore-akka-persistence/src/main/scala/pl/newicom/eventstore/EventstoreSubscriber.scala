@@ -4,6 +4,7 @@ import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import eventstore.EventNumber._
 import eventstore._
+import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.messaging.MetaData
 import pl.newicom.dddd.messaging.event.{EventMessage, EventStreamSubscriber}
 import scala.util.Success
@@ -27,7 +28,7 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
       s"subscription-${streamId.value}")
   }
 
-  def eventReceived(eventData: EventData, eventNumber: Int, metaDataProvider: EventMessage => Option[MetaData]): Unit = {
+  def eventReceived(eventData: EventData, eventNumber: Int, metaDataProvider: EventMessage[DomainEvent] => Option[MetaData]): Unit = {
     toEventMessage(eventData) match {
       case Success(em) =>
         eventReceived(em.withMetaData(metaDataProvider(em)), eventNumber)
@@ -36,7 +37,7 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
     }
   }
 
-  def receiveEvent(metaDataProvider: EventMessage => Option[MetaData]): Receive = {
+  def receiveEvent(metaDataProvider: EventMessage[DomainEvent] => Option[MetaData]): Receive = {
     case EventRecord(streamId, number, eventData, _) =>
       eventReceived(eventData, number.value, metaDataProvider)
       

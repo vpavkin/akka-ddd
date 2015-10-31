@@ -38,7 +38,7 @@ trait EventstoreSerializationSupport {
     x match {
       case x: PersistentRepr =>
         x.payload match {
-          case em: EventMessage =>
+          case em: EventMessage[DomainEvent] =>
             val (event, mdOpt) = toPayloadAndMetadata(em)
             val eventType = classFor(event).getName
             EventData(
@@ -73,23 +73,23 @@ trait EventstoreSerializationSupport {
       Failure(sys.error(s"Cannot deserialize event as $manifest, event: $event"))
   }
 
-  def toDomainEventMessage(eventData: EventData): Try[DomainEventMessage] =
+  def toDomainEventMessage(eventData: EventData): Try[DomainEventMessage[DomainEvent]] =
     fromEvent(eventData, classOf[PersistentRepr]).map { pr =>
-      val em = pr.payload.asInstanceOf[EventMessage]
+      val em = pr.payload.asInstanceOf[EventMessage[DomainEvent]]
       val aggrSnapId = new AggregateSnapshotId(pr.persistenceId, pr.sequenceNr)
-      new DomainEventMessage(em, aggrSnapId).withMetaData(em.metadata).asInstanceOf[DomainEventMessage]
+      new DomainEventMessage(em, aggrSnapId).withMetaData(em.metadata)
     }
 
-  def toEventMessage(eventData: EventData): Try[EventMessage] = {
+  def toEventMessage(eventData: EventData): Try[EventMessage[DomainEvent]] = {
     fromEvent(eventData, classOf[PersistentRepr]).map {
-      pr => pr.payload.asInstanceOf[EventMessage]
+      pr => pr.payload.asInstanceOf[EventMessage[DomainEvent]]
     }
   }
 
-  private def toPayloadAndMetadata(em: EventMessage): (DomainEvent, Option[MetaData]) =
+  private def toPayloadAndMetadata(em: EventMessage[DomainEvent]): (DomainEvent, Option[MetaData]) =
     (em.event, em.withMetaData(Map("id" -> em.id, "timestamp" -> em.timestamp)).metadata)
 
-  private def fromPayloadAndMetadata(payload: AnyRef, maybeMetadata: Option[MetaData]): EventMessage = {
+  private def fromPayloadAndMetadata(payload: AnyRef, maybeMetadata: Option[MetaData]): EventMessage[DomainEvent] = {
     if (maybeMetadata.isDefined) {
       val metadata = maybeMetadata.get
       val id: EntityId = metadata.get("id")

@@ -14,7 +14,7 @@ object DeadlinesReceptor {
           .withMetaAttribute("target", target.toSerializationFormat)
     }
     .route {
-      case em: EventMessage =>
+      case em: EventMessage[_] =>
         ActorPath.fromString(em.getMetaAttribute("target"))
     }
 }

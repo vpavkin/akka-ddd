@@ -1,19 +1,27 @@
 package pl.newicom.dddd.cluster
 
+
 import akka.actor._
 import akka.cluster.client.ClusterClientReceptionist
 import akka.cluster.sharding.{ClusterShardingSettings, ClusterSharding}
 import akka.cluster.sharding.ShardRegion.Passivate
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, PassivationConfig}
-import pl.newicom.dddd.aggregate.BusinessEntity
-import pl.newicom.dddd.office.OfficeFactory
+import pl.newicom.dddd.aggregate._
+import pl.newicom.dddd.office.{OfficeInfo, OfficeFactory}
 
-import scala.reflect.ClassTag
+trait GlobalOffice {
 
-trait ShardingSupport {
+  implicit def globalOfficeFactory[S, O, Cm <: Command, Ev <: DomainEvent, Er]
+  (implicit
+   system: ActorSystem,
+   tc: AggregateState.Aux[S, Cm, Ev, Er],
+   sr: ShardResolution[AggregateRoot[S, O, Cm, Ev, Er]],
+   entityFactory: BusinessEntityActorFactory[AggregateRoot[S, O, Cm, Ev, Er]],
+   officeInfo: OfficeInfo[O]
+  ): OfficeFactory[AggregateRoot[S, O, Cm, Ev, Er]] = {
+    new OfficeFactory[AggregateRoot[S, O, Cm, Ev, Er]] {
 
-  implicit def globalOfficeFactory[A <: BusinessEntity : ShardResolution : BusinessEntityActorFactory : ClassTag](implicit system: ActorSystem): OfficeFactory[A] = {
-    new OfficeFactory[A] {
+      override def officeName: EntityId = officeInfo.name
 
       val shardSettings = ClusterShardingSettings(system)
 
@@ -32,14 +40,12 @@ trait ShardingSupport {
         }
       }
 
-      private def startSharding(shardSettings: ClusterShardingSettings): Unit = {
-        val entityFactory = implicitly[BusinessEntityActorFactory[A]]
-        val entityProps = entityFactory.props(new PassivationConfig(Passivate(PoisonPill), entityFactory.inactivityTimeout))
-        val entityClass = implicitly[ClassTag[A]].runtimeClass
-        val sr = implicitly[ShardResolution[A]]
 
+
+      private def startSharding(shardSettings: ClusterShardingSettings): Unit = {
+        val entityProps = entityFactory.props(new PassivationConfig(Passivate(PoisonPill), entityFactory.inactivityTimeout))
         ClusterSharding(system).start(
-          typeName = entityClass.getSimpleName,
+          typeName = officeName,
           entityProps = entityProps,
           settings = shardSettings,
           extractEntityId = sr.idExtractor,

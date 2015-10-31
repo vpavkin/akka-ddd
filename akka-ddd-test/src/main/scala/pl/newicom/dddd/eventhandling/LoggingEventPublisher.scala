@@ -1,12 +1,13 @@
 package pl.newicom.dddd.eventhandling
 
 import akka.actor.Actor
+import pl.newicom.dddd.aggregate.DomainEvent
 import pl.newicom.dddd.messaging.event.DomainEventMessage
 
-trait LoggingEventPublisher extends EventPublisher {
+trait LoggingEventPublisher[E <: DomainEvent] extends EventPublisher[E] {
   this: Actor =>
 
-  override def publish(em: DomainEventMessage) {
+  override def publish(em: DomainEventMessage[E]) {
     println("Published: " + em)
   }
 

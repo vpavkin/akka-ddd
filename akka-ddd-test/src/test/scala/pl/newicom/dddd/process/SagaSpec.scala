@@ -4,6 +4,7 @@ import akka.actor._
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, WordSpecLike}
 import pl.newicom.dddd.actor.PassivationConfig
+import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.alod.Delivered
 import pl.newicom.dddd.messaging.MetaData._
 import pl.newicom.dddd.messaging.event.EventMessage
@@ -24,7 +25,7 @@ class SagaSpec extends TestKit(TestConfig.testSystem) with WordSpecLike with Imp
     override def props(pc: PassivationConfig): Props = {
       Props(new DummySaga(pc, None) {
         override def receiveUnexpected: Receive = {
-          case em: EventMessage =>
+          case em: EventMessage[_] =>
             system.eventStream.publish(em.event)
         }
       })
@@ -73,7 +74,7 @@ class SagaSpec extends TestKit(TestConfig.testSystem) with WordSpecLike with Imp
     }
   }
 
-  def toEventMessage(e: ValueChanged): EventMessage = {
+  def toEventMessage(e: ValueChanged): EventMessage[DomainEvent] = {
     new EventMessage(e).withMetaData(Map(
       CorrelationId -> processId,
       DeliveryId -> 1L
