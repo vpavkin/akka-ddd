@@ -20,6 +20,8 @@ object Deps {
 
     val LogbackClassic        = "1.1.3"
     val nScalaTime            = "2.2.0"
+
+    val scalaz                = "7.1.4"
   }
 
   object Akka {
@@ -51,6 +53,10 @@ object Deps {
   object Eventstore {
     val client        = "com.geteventstore" %% "eventstore-client" % Version.EventStoreClient
     val akkaJournal   = "com.geteventstore" %% "akka-persistence-eventstore" % Version.EventStoreAkkaJournal
+  }
+
+  object Scalaz {
+    val core          = "org.scalaz" %% "scalaz-core" % Version.scalaz
   }
 
   object SqlDb {

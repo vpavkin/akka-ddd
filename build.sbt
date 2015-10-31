@@ -5,7 +5,7 @@ import java.net.URL
 
 name := "akka-ddd"
 
-version in ThisBuild := "1.0.8-SNAPSHOT"
+version in ThisBuild := "1.0.9-SNAPSHOT"
 organization in ThisBuild := "pl.newicom.dddd"
 scalaVersion in ThisBuild := "2.11.7"
 
@@ -36,7 +36,7 @@ lazy val `akka-ddd-core` = project
     scalacOptions ++= Seq("-language:implicitConversions"),
     publishArtifact in Test := true,
     libraryDependencies ++= Seq(
-      Akka.clusterTools, Akka.clusterSharding, Akka.persistence, Akka.slf4j
+      Akka.clusterTools, Akka.clusterSharding, Akka.persistence, Akka.slf4j, Scalaz.core
     ))
   .dependsOn(`akka-ddd-messaging`)
 
