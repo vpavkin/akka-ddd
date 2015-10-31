@@ -23,6 +23,8 @@ object Deps {
     val nScalaTime            = "2.2.0"
 
     val scalaz                = "7.1.4"
+
+    val shapeless              = "2.2.5"
   }
 
   object Akka {
@@ -59,6 +61,8 @@ object Deps {
   object Scalaz {
     val core          = "org.scalaz" %% "scalaz-core" % Version.scalaz
   }
+
+  val Shapeless = "com.chuusai" %% "shapeless" % Version.shapeless
 
   object SqlDb {
     val `slick-for-pg` = "com.github.tminglei" %% "slick-pg" % Version.PostgresqlSlickExt exclude("org.slf4j", "slf4j-simple")

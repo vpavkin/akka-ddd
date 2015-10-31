@@ -10,6 +10,8 @@ import pl.newicom.dddd.test.support.OfficeSpec
 import pl.newicom.dddd.test.support.TestConfig._
 import DummyOfficeWithGenSpec._
 import scala.concurrent.duration.{Duration, _}
+import scalaz._
+
 
 object DummyOfficeWithGenSpec {
   implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
@@ -111,7 +113,7 @@ class DummyOfficeWithGenSpec extends OfficeSpec[DummyAggregateRoot](Some(testSys
         // alternatively:
         //arbitraryOf[CreateDummy](_ copy(value = -1))
       }
-      .expectException[RuntimeException]("negative value not allowed")
+      .expectAck(-\/("negative value not allowed"))
     }
   }
 

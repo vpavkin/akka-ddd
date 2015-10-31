@@ -100,6 +100,13 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
       expectEvent(f(wc.command, wc.params.head))
     }
 
+    def expectAck[E](ack: E): Unit = {
+      whenFun()
+      expectMsgPF[Boolean](timeoutThen.duration) {
+        case Processed(scala.util.Success(`ack`)) => true
+      }
+    }
+
     def expectException[E <: Exception](message: String = null)(implicit t: ClassTag[E]): Unit = {
       whenFun()
       expectMsgPF[Boolean](timeoutThen.duration, hint = s"Failure caused by ${t.runtimeClass.getName} with message $message") {

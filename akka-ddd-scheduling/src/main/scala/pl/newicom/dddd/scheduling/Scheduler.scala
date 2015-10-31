@@ -15,9 +15,11 @@ object Scheduler {
 
     override def applyEvent(state: Scheduler): ApplyEvent = { _ => state }
 
-    override def handleInitiated: HandleInitiated = ???
+    override def applyFirstEvent: HandleInitiated = {case _ => new Scheduler {}}
 
-    override def initiate: Initiate = ???
+    override def processFirstCommand: Initiate = {
+      case e: ScheduleEvent => processCommand(new Scheduler {})(e)
+    }
 
     override def processCommand(state: Scheduler): ProcessCommand = {
       case ScheduleEvent(bu, target, deadline, msg) =>

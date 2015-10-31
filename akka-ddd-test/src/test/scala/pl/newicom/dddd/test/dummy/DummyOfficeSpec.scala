@@ -8,7 +8,7 @@ import pl.newicom.dddd.test.dummy.DummyAggregateRoot._
 import pl.newicom.dddd.test.dummy.DummyOfficeSpec._
 import pl.newicom.dddd.test.support.OfficeSpec
 import pl.newicom.dddd.test.support.TestConfig.testSystem
-
+import scalaz._
 import scala.concurrent.duration.{Duration, _}
 
 object DummyOfficeSpec {
@@ -64,7 +64,7 @@ class DummyOfficeSpec extends OfficeSpec[DummyAggregateRoot](Some(testSystem)) {
       when {
         CreateDummy(dummyId, "dummy name", "dummy description", value = -1)
       }
-      .expectException[RuntimeException]("negative value not allowed")
+      .expectAck(-\/("negative value not allowed"))
     }
 
   }

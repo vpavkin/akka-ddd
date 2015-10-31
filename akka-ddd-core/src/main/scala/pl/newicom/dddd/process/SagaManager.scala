@@ -9,11 +9,11 @@ import pl.newicom.dddd.office.OfficeInfo
 import SagaManager._
 import scala.concurrent.duration._
 
-class BusinessProcess[A : OfficeInfo]
+class BusinessProcess
 
 object SagaManager {
-  implicit def businessProcessInfo(implicit sc: SagaConfig[_]): OfficeInfo[BusinessProcess[_]] = {
-    new OfficeInfo[BusinessProcess[_]] {
+  implicit def businessProcessInfo(implicit sc: SagaConfig[_]): OfficeInfo[BusinessProcess] = {
+    new OfficeInfo[BusinessProcess] {
       def name = sc.name
       override def isSagaOffice = true
     }
@@ -28,7 +28,7 @@ class SagaManager(sagaConfig: SagaConfig[_], sagaOffice: ActorPath) extends Rece
 
   lazy val config: ReceptorConfig =
     ReceptorBuilder().
-      reactTo[BusinessProcess[_]].
+      reactTo[BusinessProcess].
       propagateTo(sagaOffice)
   
   override def redeliverInterval = 30.seconds

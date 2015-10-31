@@ -58,13 +58,13 @@ class SqlViewUpdateServiceIntegrationSpec
       system.actorOf(Props(
         new SqlViewUpdateService with SqlViewStoreConfiguration {
           def config = SqlViewUpdateServiceIntegrationSpec.this.config
-          def vuConfigs = List(SqlViewUpdateConfig("test-view", dummyOffice, new Projection[DummyEvent] {
+          def vuConfigs = List(SqlViewUpdateConfig("test-view", dummyOffice, new Projection {
 
             def failIfRequired(msg: String) =
               if (shouldFail) failed(new RuntimeException(msg)) else successful(())
 
-            def consume(em: DomainEventMessage[DummyEvent]): ProjectionAction[All] = {
-              val event = em.event
+            def consume(em: DomainEventMessage[pl.newicom.dddd.aggregate.DomainEvent]): ProjectionAction[All] = {
+              val event = em.event.asInstanceOf[DummyEvent]
               val ignore = !aggregateId.equals(event.id)
               if (ignore)
                 successful(())

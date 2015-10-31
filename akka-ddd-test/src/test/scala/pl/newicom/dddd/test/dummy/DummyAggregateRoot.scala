@@ -2,16 +2,8 @@ package pl.newicom.dddd.test.dummy
 
 import java.util.UUID
 
-import akka.actor.Props
-import pl.newicom.dddd.actor.PassivationConfig
-import pl.newicom.dddd.aggregate
-import pl.newicom.dddd.aggregate.{Command, AggregateRoot, AggregateState, EntityId}
-import pl.newicom.dddd.eventhandling.EventPublisher
-import pl.newicom.dddd.messaging.CollaborationSupport
+import pl.newicom.dddd.aggregate.{AggregateState, Command, EntityId}
 import pl.newicom.dddd.office.OfficeInfo
-import pl.newicom.dddd.test.dummy.DummyAggregateRoot._
-import pl.newicom.dddd.test.dummy.ValueGenerator.GenerateRandom
-import pl.newicom.dddd.utils.UUIDSupport.uuidObj
 
 object DummyAggregateRoot {
 
@@ -52,7 +44,9 @@ object DummyAggregateRoot {
   case class CandidateValue(value: Int, confirmationToken: UUID)
 
 
-  case class DummyState(value: Int, candidateValue: Option[CandidateValue] = None)
+  case class DummyState(value: Int, candidateValue: Option[CandidateValue], version: Int) {
+    def bumpVersion: DummyState = copy(version = version + 1)
+  }
 
     object DummyState {
       implicit val instance =  new AggregateState[DummyState] {
@@ -62,15 +56,8 @@ object DummyAggregateRoot {
         override type ErrorImpl = String
         override type EventImpl = DummyEvent
 
-        override def applyEvent(state: DummyState): ApplyEvent = {
-          case ValueChanged(_, newValue, _) =>
-            state.copy(value = newValue, candidateValue = None)
-          case ValueGenerated(_, newValue, confirmationToken) =>
-            state.copy(candidateValue = Some(CandidateValue(newValue, confirmationToken)))
-          case _ => state
-        }
 
-        override def initiate: Initiate = {
+        override def processFirstCommand: Initiate = {
           case CreateDummy(id, name, description, value) =>
               if (value < 0) {
                 reject("negative value not allowed")
@@ -80,8 +67,8 @@ object DummyAggregateRoot {
           case _ => reject("Unknown dummy")
         }
 
-        override def handleInitiated: HandleInitiated = {
-          case DummyCreated(_, _, _, value) => DummyState(value)
+        override def applyFirstEvent: HandleInitiated = {
+          case DummyCreated(_, _, _, value) => DummyState(value, None, 0)
         }
 
         override def processCommand(state: DummyState): ProcessCommand = {
@@ -95,7 +82,7 @@ object DummyAggregateRoot {
           case ChangeValue(id, value) => if (value < 0) {
             reject("negative value not allowed")
           } else {
-            raise(ValueChanged(id, value, 0L))
+            raise(ValueChanged(id, value, state.version + 1))
           }
 
           case GenerateValue(id) =>
@@ -104,11 +91,19 @@ object DummyAggregateRoot {
 
           case ConfirmGeneratedValue(id, confirmationToken) =>
             candidateValue(state)(confirmationToken).map { value =>
-              raise(ValueChanged(id, value, 0L))
+              raise(ValueChanged(id, value, state.version + 1))
             } getOrElse {
               reject("Not found")
             }
         }
+
+        override def applyEvent(state: DummyState): ApplyEvent = { e: EventImpl => e match {
+          case ValueChanged(_, newValue, _) =>
+            state.copy(value = newValue, candidateValue = None)
+          case ValueGenerated(_, newValue, confirmationToken) =>
+            state.copy(candidateValue = Some(CandidateValue(newValue, confirmationToken)))
+          case _ => state
+        } } andThen(_.bumpVersion)
 
         def candidateValue(state: DummyState)(confirmationToken: UUID): Option[Int] = {
           state.candidateValue.flatMap { cv =>

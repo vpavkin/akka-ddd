@@ -51,14 +51,14 @@ case class ReceptorBuilder(
   def applyTransduction(transduction: Transduction) =
     copy(transduction = transduction)
 
-  def route(_receiverResolver: ReceiverResolver) =
+  def route(_receiverResolver: ReceiverResolver): ReceptorConfig =
     new ReceptorConfig() {
       def stimuliSource = self.stimuliSource
       def transduction = self.transduction
       def receiverResolver = _receiverResolver
     }
 
-  def propagateTo(_receiver: ActorPath) = route({case _ => _receiver})
+  def propagateTo(_receiver: ActorPath): ReceptorConfig = route({case _ => _receiver})
 }
 
 abstract class Receptor extends AtLeastOnceDeliverySupport {

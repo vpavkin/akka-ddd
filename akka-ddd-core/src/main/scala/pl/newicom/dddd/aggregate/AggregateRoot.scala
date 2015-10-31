@@ -31,8 +31,8 @@ trait AggregateState[State] {
 
   def processCommand(state: State): ProcessCommand
   def applyEvent(state: State): ApplyEvent
-  def initiate: Initiate
-  def handleInitiated: HandleInitiated
+  def processFirstCommand: Initiate
+  def applyFirstEvent: HandleInitiated
 
   def raise(e: EventImpl): CommandProcessingResult = e.right
   def reject(e: ErrorImpl): CommandProcessingResult = e.left
@@ -88,7 +88,7 @@ abstract class AggregateRoot[S, O, Cm <: Command, Ev <: DomainEvent, Er](implici
   def commandMessage = _lastCommandMessage.get
 
   def handleCommand: Cm => Unit = { command =>
-    val processingResult = initialized ? as.processCommand(state)(command) | as.initiate(command)
+    val processingResult = initialized ? as.processCommand(state)(command) | as.processFirstCommand(command)
     processingResult.map { event =>
       raise(event)
     }.leftMap(_.left[Ev]).valueOr(acknowledgeCommand)
@@ -105,7 +105,7 @@ abstract class AggregateRoot[S, O, Cm <: Command, Ev <: DomainEvent, Er](implici
 
   def updateState(persisted: EventMessage[Ev]) {
     val event = persisted.event
-    val nextState = if (initialized) as.applyEvent(state)(event) else as.handleInitiated(event)
+    val nextState = if (initialized) as.applyEvent(state)(event) else as.applyFirstEvent(event)
     stateOpt = Option(nextState)
     messageProcessed(persisted)
   }
