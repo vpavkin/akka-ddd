@@ -12,22 +12,22 @@ object Office {
     implicitly[OfficeFactory[A]].getOrCreate
   }
 
-  trait Office[O, S] {
-    def apply[Cm <: Command, Ev <: DomainEvent, Er]()(implicit
-                                                     tc: AggregateState.Aux[S, Cm, Ev, Er],
-                                                     factory: AggregateRootActorFactory[AggregateRoot[S, O, Cm, Ev, Er]],
-                                                     shardResolution: ShardResolution[AggregateRoot[S, O, Cm, Ev, Er]],
-                                                     officeInfo: OfficeInfo[O],
-                                                     officeFactory: OfficeFactory[AggregateRoot[S, O, Cm, Ev, Er]]): ActorRef
+  trait Office[O] {
+    def apply[S, Cm <: Command, Ev <: DomainEvent, Er]()(implicit
+                                                         tc: AggregateRoot.Aux[S, O, Cm, Ev, Er],
+                                                         factory: AggregateRootActorFactory[AggregateRootActor[S, O, Cm, Ev, Er]],
+                                                         shardResolution: ShardResolution[AggregateRootActor[S, O, Cm, Ev, Er]],
+                                                         officeInfo: OfficeInfo[O],
+                                                         officeFactory: OfficeFactory[AggregateRootActor[S, O, Cm, Ev, Er]]): ActorRef
   }
 
-  def office[O, S] = new Office[O, S] {
-    override def apply[Cm <: Command, Ev <: DomainEvent, Er]()(implicit
-                                                           tc: AggregateState.Aux[S, Cm, Ev, Er],
-                                                           factory: AggregateRootActorFactory[AggregateRoot[S, O, Cm, Ev, Er]],
-                                                           shardResolution: ShardResolution[AggregateRoot[S, O, Cm, Ev, Er]],
-                                                           officeInfo: OfficeInfo[O],
-                                                           officeFactory: OfficeFactory[AggregateRoot[S, O, Cm, Ev, Er]]): ActorRef =
+  def office[O] = new Office[O] {
+    override def apply[S, Cm <: Command, Ev <: DomainEvent, Er]()(implicit
+                                                                  tc: AggregateRoot.Aux[S, O, Cm, Ev, Er],
+                                                                  factory: AggregateRootActorFactory[AggregateRootActor[S, O, Cm, Ev, Er]],
+                                                                  shardResolution: ShardResolution[AggregateRootActor[S, O, Cm, Ev, Er]],
+                                                                  officeInfo: OfficeInfo[O],
+                                                                  officeFactory: OfficeFactory[AggregateRootActor[S, O, Cm, Ev, Er]]): ActorRef =
     officeFactory.getOrCreate
   }
 

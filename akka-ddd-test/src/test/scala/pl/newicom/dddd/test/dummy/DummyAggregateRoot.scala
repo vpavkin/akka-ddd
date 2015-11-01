@@ -2,7 +2,7 @@ package pl.newicom.dddd.test.dummy
 
 import java.util.UUID
 
-import pl.newicom.dddd.aggregate.{AggregateState, Command, EntityId}
+import pl.newicom.dddd.aggregate.{AggregateRoot, Command, EntityId}
 import pl.newicom.dddd.office.OfficeInfo
 
 object DummyAggregateRoot {
@@ -49,7 +49,7 @@ object DummyAggregateRoot {
   }
 
     object DummyState {
-      implicit val instance =  new AggregateState[DummyState] {
+      implicit val instance =  new AggregateRoot[DummyState] {
 
 
         override type CommandImpl = DummyCommand
@@ -57,7 +57,7 @@ object DummyAggregateRoot {
         override type EventImpl = DummyEvent
 
 
-        override def processFirstCommand: Initiate = {
+        override def processFirstCommand: ProcessFirstCommand = {
           case CreateDummy(id, name, description, value) =>
               if (value < 0) {
                 reject("negative value not allowed")
@@ -67,7 +67,7 @@ object DummyAggregateRoot {
           case _ => reject("Unknown dummy")
         }
 
-        override def applyFirstEvent: HandleInitiated = {
+        override def applyFirstEvent: ApplyFirstEvent = {
           case DummyCreated(_, _, _, value) => DummyState(value, None, 0)
         }
 

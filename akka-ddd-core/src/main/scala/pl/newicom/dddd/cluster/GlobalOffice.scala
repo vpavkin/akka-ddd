@@ -14,12 +14,12 @@ trait GlobalOffice {
   implicit def globalOfficeFactory[S, O, Cm <: Command, Ev <: DomainEvent, Er]
   (implicit
    system: ActorSystem,
-   tc: AggregateState.Aux[S, Cm, Ev, Er],
-   sr: ShardResolution[AggregateRoot[S, O, Cm, Ev, Er]],
-   entityFactory: BusinessEntityActorFactory[AggregateRoot[S, O, Cm, Ev, Er]],
+   tc: AggregateRoot.Aux[S, O, Cm, Ev, Er],
+   sr: ShardResolution[AggregateRootActor[S, O, Cm, Ev, Er]],
+   entityFactory: BusinessEntityActorFactory[AggregateRootActor[S, O, Cm, Ev, Er]],
    officeInfo: OfficeInfo[O]
-  ): OfficeFactory[AggregateRoot[S, O, Cm, Ev, Er]] = {
-    new OfficeFactory[AggregateRoot[S, O, Cm, Ev, Er]] {
+  ): OfficeFactory[AggregateRootActor[S, O, Cm, Ev, Er]] = {
+    new OfficeFactory[AggregateRootActor[S, O, Cm, Ev, Er]] {
 
       override def officeName: EntityId = officeInfo.name
 

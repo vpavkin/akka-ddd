@@ -10,16 +10,15 @@ sealed trait Scheduler
 
 object Scheduler {
 
-  implicit val state = new AggregateState[Scheduler] {
+  implicit val state = new AggregateRoot[Scheduler, SchedulingOffice] {
     override type EventImpl = EventScheduled
+    override type CommandImpl = ScheduleEvent
+    override type ErrorImpl = Nothing
 
-    override def applyEvent(state: Scheduler): ApplyEvent = { _ => state }
-
-    override def applyFirstEvent: HandleInitiated = {case _ => new Scheduler {}}
-
-    override def processFirstCommand: Initiate = {
+    override def processFirstCommand: ProcessFirstCommand = {
       case e: ScheduleEvent => processCommand(new Scheduler {})(e)
     }
+    override def applyFirstEvent: ApplyFirstEvent = {case _ => new Scheduler {}}
 
     override def processCommand(state: Scheduler): ProcessCommand = {
       case ScheduleEvent(bu, target, deadline, msg) =>
@@ -32,13 +31,11 @@ object Scheduler {
             msg)
         )
     }
-
-    override type CommandImpl = ScheduleEvent
-    override type ErrorImpl = Nothing
+    override def applyEvent(state: Scheduler): ApplyEvent = Function.const(state)
   }
 }
 
-class SchedulerActor(val pc: PassivationConfig) extends AggregateRoot[Scheduler, SchedulingOffice, ScheduleEvent, EventScheduled, Nothing] {
+class SchedulerActor(val pc: PassivationConfig) extends AggregateRootActor[Scheduler, SchedulingOffice, ScheduleEvent, EventScheduled, Nothing] {
   this: EventPublisher[EventScheduled] =>
 
   // Skip recovery

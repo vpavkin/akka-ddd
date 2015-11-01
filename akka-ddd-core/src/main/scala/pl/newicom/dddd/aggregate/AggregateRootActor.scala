@@ -18,41 +18,41 @@ import scala.concurrent.duration.{Duration, _}
 import scala.util.{Failure, Success, Try}
 
 
-trait AggregateState[State] {
-  type EventImpl
-  type CommandImpl
+trait AggregateRoot[State, Office] {
+  type EventImpl <: aggregate.DomainEvent
+  type CommandImpl <: Command
   type ErrorImpl
 
   type CommandProcessingResult = ErrorImpl \/ EventImpl
   type ProcessCommand = CommandImpl => CommandProcessingResult
   type ApplyEvent = EventImpl => State
-  type Initiate = PartialFunction[CommandImpl, CommandProcessingResult]
-  type HandleInitiated = PartialFunction[EventImpl, State]
+  type ProcessFirstCommand = PartialFunction[CommandImpl, CommandProcessingResult]
+  type ApplyFirstEvent = PartialFunction[EventImpl, State]
 
   def processCommand(state: State): ProcessCommand
   def applyEvent(state: State): ApplyEvent
-  def processFirstCommand: Initiate
-  def applyFirstEvent: HandleInitiated
+  def processFirstCommand: ProcessFirstCommand
+  def applyFirstEvent: ApplyFirstEvent
 
   def raise(e: EventImpl): CommandProcessingResult = e.right
   def reject(e: ErrorImpl): CommandProcessingResult = e.left
 }
 
-object AggregateState {
-  type Aux[S, CommandImpl0 <: Command, EventImpl0 <: aggregate.DomainEvent, ErrorImpl0] = AggregateState[S] {
+object AggregateRoot {
+  type Aux[S, O, CommandImpl0 <: Command, EventImpl0 <: aggregate.DomainEvent, ErrorImpl0] = AggregateRoot[S, O] {
     type EventImpl = EventImpl0
     type CommandImpl = CommandImpl0
     type ErrorImpl = ErrorImpl0
   }
 }
 
-abstract class AggregateRootActorFactory[A <: AggregateRoot[_, _, _, _, _]]
+abstract class AggregateRootActorFactory[A <: AggregateRootActor[_, _, _, _, _]]
   extends BusinessEntityActorFactory[A] {
   def props(pc: PassivationConfig): Props
   def inactivityTimeout: Duration = 1.minute
 }
 
-abstract class AggregateRoot[S, O, Cm <: Command, Ev <: DomainEvent, Er](implicit as: AggregateState.Aux[S, Cm, Ev, Er], officeInfo: OfficeInfo[O], ev: ClassTag[Ev], cm: ClassTag[Cm])
+abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](implicit as: AggregateRoot.Aux[S, O, Cm, Ev, Er], officeInfo: OfficeInfo[O], ev: ClassTag[Ev], cm: ClassTag[Cm])
   extends BusinessEntity with GracefulPassivation with PersistentActor
   with EventHandler[Ev] with Deduplication with ActorLogging {
 
