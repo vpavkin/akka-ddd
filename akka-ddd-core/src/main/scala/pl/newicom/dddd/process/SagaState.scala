@@ -34,7 +34,7 @@ case class OpenOffice2(aggregateId: String) extends Command
 
 case class OfficeOpened2(aggregateId: String) extends DomainEvent
 
-trait TOC2 extends Contract[TestOffice] {
+trait TOC2 extends Contract[TestOffice2] {
   override type CommandImpl = OpenOffice2
   override type ErrorImpl = String
   override type EventImpl = OfficeOpened2

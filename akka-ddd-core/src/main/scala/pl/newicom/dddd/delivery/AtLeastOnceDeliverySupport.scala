@@ -1,10 +1,11 @@
 package pl.newicom.dddd.delivery
 
-import akka.actor.{ActorPath, ActorLogging}
+import akka.actor.{ActorLogging, ActorPath}
 import akka.persistence.AtLeastOnceDelivery.AtLeastOnceDeliverySnapshot
 import akka.persistence._
 import pl.newicom.dddd.delivery.protocol.alod.Delivered
 import pl.newicom.dddd.messaging.{EntityMessage, Message}
+import pl.newicom.dddd.persistence.SaveSnapshotRequest
 
 case class DeliveryStateSnapshot(state: DeliveryState, alodSnapshot: AtLeastOnceDeliverySnapshot)
 
@@ -17,6 +18,8 @@ trait AtLeastOnceDeliverySupport extends PersistentActor with AtLeastOnceDeliver
   def recoveryCompleted(): Unit
   
   def lastSentDeliveryId: Option[Long] = deliveryState.lastSentOpt
+
+  def unconfirmedNumber: Int = deliveryState.unconfirmedNumber
 
   def deliver(msg: Message, deliveryId: Long): Unit =
     persist(msg.withDeliveryId(deliveryId))(updateState)
@@ -43,6 +46,7 @@ trait AtLeastOnceDeliverySupport extends PersistentActor with AtLeastOnceDeliver
         log.debug(s"[DELIVERY-ID: $internalDeliveryId] - Delivery confirmed")
         if (confirmDelivery(internalDeliveryId)) {
           deliveryState = deliveryState.withDelivered(deliveryId)
+          deliveryStateUpdated(deliveryState)
         }
       }
 
@@ -52,7 +56,7 @@ trait AtLeastOnceDeliverySupport extends PersistentActor with AtLeastOnceDeliver
     case receipt: Delivered =>
       persist(receipt)(updateState)
 
-    case "snap" =>
+    case SaveSnapshotRequest =>
       val snapshot = new DeliveryStateSnapshot(deliveryState, getDeliverySnapshot)
       log.debug(s"Saving snapshot: $snapshot")
       saveSnapshot(snapshot)
@@ -62,6 +66,7 @@ trait AtLeastOnceDeliverySupport extends PersistentActor with AtLeastOnceDeliver
 
     case f @ SaveSnapshotFailure(metadata, reason) =>
       log.error(s"$f")
+      throw reason
 
   }
 
@@ -74,9 +79,13 @@ trait AtLeastOnceDeliverySupport extends PersistentActor with AtLeastOnceDeliver
       setDeliverySnapshot(alodSnapshot)
       deliveryState = dState
       log.debug(s"Snapshot restored: $deliveryState")
+      deliveryStateUpdated(deliveryState)
 
     case msg =>
       updateState(msg)
   }
 
+  def deliveryStateUpdated(deliveryState: DeliveryState): Unit = {
+    // do nothing
+  }
 }
