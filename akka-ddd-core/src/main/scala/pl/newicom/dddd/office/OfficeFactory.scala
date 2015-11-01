@@ -7,7 +7,7 @@ import pl.newicom.dddd.messaging.correlation.EntityIdResolution
 
 import scala.reflect.ClassTag
 
-abstract class OfficeFactory[A <: BusinessEntity : BusinessEntityActorFactory : EntityIdResolution : ClassTag] {
+abstract class OfficeFactory[A : ClassTag] {
 
   def getOrCreate: ActorRef
 

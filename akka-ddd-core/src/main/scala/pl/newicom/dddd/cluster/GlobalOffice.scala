@@ -9,17 +9,20 @@ import pl.newicom.dddd.actor.{BusinessEntityActorFactory, PassivationConfig}
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.office.{OfficeInfo, OfficeFactory}
 
+import scala.reflect.ClassTag
+
 trait GlobalOffice {
 
-  implicit def globalOfficeFactory[S, O, Cm <: Command, Ev <: DomainEvent, Er]
+  implicit def globalOfficeFactory[S, O]
   (implicit
    system: ActorSystem,
-   tc: AggregateRoot.Aux[S, O, Cm, Ev, Er],
-   sr: ShardResolution[AggregateRootActor[S, O, Cm, Ev, Er]],
-   entityFactory: BusinessEntityActorFactory[AggregateRootActor[S, O, Cm, Ev, Er]],
-   officeInfo: OfficeInfo[O]
-  ): OfficeFactory[AggregateRootActor[S, O, Cm, Ev, Er]] = {
-    new OfficeFactory[AggregateRootActor[S, O, Cm, Ev, Er]] {
+   tc: AggregateRoot[S, O],
+   sr: ShardResolution[S],
+   entityFactory: BusinessEntityActorFactory[S],
+   officeInfo: OfficeInfo[O],
+    s: ClassTag[S]
+  ): OfficeFactory[S] = {
+    new OfficeFactory[S] {
 
       override def officeName: EntityId = officeInfo.name
 

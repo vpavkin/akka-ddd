@@ -1,21 +1,17 @@
 package pl.newicom.dddd.office
 
-import scala.reflect.ClassTag
+import pl.newicom.dddd.aggregate.{DomainEvent, Command}
 
-object OfficeInfo {
-  def apply[A]()(implicit ct: ClassTag[A]): OfficeInfo[A] =
-    new OfficeInfo[A] {
-      def name = ct.runtimeClass.getSimpleName
-    }
-
-  def apply[A](_name: String): OfficeInfo[A] =
-    new OfficeInfo[A] {
-      def name = _name
-    }
-
-}
-
-trait OfficeInfo[A] {
+trait OfficeInfo[A] extends Contract[A] {
   def name: String
   def isSagaOffice: Boolean = false
+}
+
+
+object OfficeInfo {
+  type Aux[A, Cm <: Command, Ev <: DomainEvent, Er] = OfficeInfo[A] {
+    type CommandImpl = Cm
+    type EventImpl = Ev
+    type ErrorImpl = Er
+  }
 }

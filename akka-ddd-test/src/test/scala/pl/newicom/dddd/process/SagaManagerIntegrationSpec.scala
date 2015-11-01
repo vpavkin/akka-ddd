@@ -39,7 +39,7 @@ class SagaManagerIntegrationSpec extends OfficeSpec[DummyAggregateRoot](Some(int
 
   def dummyId = aggregateId
 
-  implicit lazy val testSagaConfig = new DummySagaConfig(s"${dummy.dummyOffice.name}-$dummyId")
+  implicit lazy val testSagaConfig = new DummySagaConfig(s"${DummyAggregateRoot.DummyOffice.info.name}-$dummyId")
 
   implicit val sagaManagerFactory: SagaManagerFactory = (sagaConfig, sagaOffice) => {
     new SagaManager(sagaConfig, sagaOffice) with EventstoreSubscriber {

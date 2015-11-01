@@ -22,7 +22,7 @@ object Scheduler {
 
     override def processCommand(state: Scheduler): ProcessCommand = {
       case ScheduleEvent(bu, target, deadline, msg) =>
-        raise(
+        accept(
           EventScheduled(
             bu,
             target,

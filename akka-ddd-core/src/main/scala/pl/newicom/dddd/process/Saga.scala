@@ -58,6 +58,9 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
   override def aroundReceive(receive: Receive, msg: Any): Unit = {
     super.aroundReceive(receiveDuplicate(acknowledgeEvent).orElse(receive), msg)
   }
+  /*
+  Thanks for your response. As I see from sources Saga will resend all commands issued in `applyEvent` during recovery. However receiving actor  will ignore duplicated commands due to `Deduplication trait` and caoused. BTW I’m currently in the process of refactoring akka-ddd to be more type-safe using typeclasses.
+   */
 
   override def receiveCommand: Receive = receiveDeliveryReceipt orElse receiveEvent orElse receiveUnexpected
 

@@ -2,8 +2,11 @@ package pl.newicom.dddd.test.dummy
 
 import java.util.UUID
 
-import pl.newicom.dddd.aggregate.{AggregateRoot, Command, EntityId}
-import pl.newicom.dddd.office.OfficeInfo
+import pl.newicom.dddd.actor.PassivationConfig
+import pl.newicom.dddd.aggregate.{AggregateRootActor, AggregateRoot, Command, EntityId}
+import pl.newicom.dddd.eventhandling.EventPublisher
+import pl.newicom.dddd.office.{Contract, OfficeInfo}
+import pl.newicom.dddd.utils.UUIDSupport
 
 object DummyAggregateRoot {
 
@@ -11,10 +14,18 @@ object DummyAggregateRoot {
   // Commands
   //
 
+  trait DummyOfficeContract extends Contract[DummyOffice] {
+    override type CommandImpl = DummyCommand
+    override type ErrorImpl = String
+    override type EventImpl = DummyEvent
+  }
+
   trait DummyOffice
 
   object DummyOffice {
-    implicit val info = OfficeInfo[DummyOffice]("Dummy")
+    implicit val info = new OfficeInfo[DummyOffice] with DummyOfficeContract {
+      override def name: String = "Dummy"
+    }
   }
 
   sealed trait DummyCommand extends Command {
@@ -49,20 +60,13 @@ object DummyAggregateRoot {
   }
 
     object DummyState {
-      implicit val instance =  new AggregateRoot[DummyState] {
-
-
-        override type CommandImpl = DummyCommand
-        override type ErrorImpl = String
-        override type EventImpl = DummyEvent
-
-
+      implicit val instance =  new AggregateRoot[DummyState, DummyOffice] with DummyOfficeContract with UUIDSupport {
         override def processFirstCommand: ProcessFirstCommand = {
           case CreateDummy(id, name, description, value) =>
               if (value < 0) {
                 reject("negative value not allowed")
               } else {
-                raise(DummyCreated(id, name, description, value))
+                accept(DummyCreated(id, name, description, value))
               }
           case _ => reject("Unknown dummy")
         }
@@ -74,24 +78,24 @@ object DummyAggregateRoot {
         override def processCommand(state: DummyState): ProcessCommand = {
           case CreateDummy(id, name, description, value) => reject("Dummy already exists")
 
-          case ChangeName(id, name) => raise(NameChanged(id, name))
+          case ChangeName(id, name) => accept(NameChanged(id, name))
 
-          case ChangeDescription(id, description) => raise(DescriptionChanged(id, description))
+          case ChangeDescription(id, description) => accept(DescriptionChanged(id, description))
 
 
           case ChangeValue(id, value) => if (value < 0) {
             reject("negative value not allowed")
           } else {
-            raise(ValueChanged(id, value, state.version + 1))
+            accept(ValueChanged(id, value, state.version + 1))
           }
 
           case GenerateValue(id) =>
             val value = (Math.random() * 100).toInt
-            raise(ValueGenerated(id, value, confirmationToken = uuidObj))
+            accept(ValueGenerated(id, value, confirmationToken = uuidObj))
 
           case ConfirmGeneratedValue(id, confirmationToken) =>
             candidateValue(state)(confirmationToken).map { value =>
-              raise(ValueChanged(id, value, state.version + 1))
+              accept(ValueChanged(id, value, state.version + 1))
             } getOrElse {
               reject("Not found")
             }
@@ -114,6 +118,8 @@ object DummyAggregateRoot {
     }
 }
 
-class DummyAggregateRoot extends AggregateRoot[DummyState, DummyOffice, DummyCommand, DummyEvent, String] { this: EventPublisher[DummyEvent] =>
+import DummyAggregateRoot._
+
+class DummyAggregateRoot extends AggregateRootActor[DummyState, DummyOffice, DummyCommand, DummyEvent, String] { this: EventPublisher[DummyEvent] =>
   override val pc = PassivationConfig()
 }

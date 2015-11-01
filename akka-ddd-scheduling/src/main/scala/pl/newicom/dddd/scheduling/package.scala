@@ -6,6 +6,11 @@ import pl.newicom.dddd.office.OfficeInfo
 package object scheduling {
 
   implicit val schedulingOffice: OfficeInfo[SchedulingOffice] = new OfficeInfo[SchedulingOffice] {
+
+    override type CommandImpl = ScheduleEvent
+    override type ErrorImpl = Nothing
+    override type EventImpl = EventScheduled
+
     def name: String = "deadlines"
   }
 

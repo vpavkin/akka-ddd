@@ -9,7 +9,7 @@ import pl.newicom.dddd.eventhandling.{EventPublisher, EventHandler}
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.event.{AggregateSnapshotId, DomainEventMessage, EventMessage}
 import pl.newicom.dddd.messaging.{Deduplication, Message}
-import pl.newicom.dddd.office.OfficeInfo
+import pl.newicom.dddd.office.{Contract, OfficeInfo}
 
 import scala.reflect.ClassTag
 import scalaz.\/
@@ -18,10 +18,7 @@ import scala.concurrent.duration.{Duration, _}
 import scala.util.{Failure, Success, Try}
 
 
-trait AggregateRoot[State, Office] {
-  type EventImpl <: aggregate.DomainEvent
-  type CommandImpl <: Command
-  type ErrorImpl
+trait AggregateRoot[State, Office] extends Contract[Office] {
 
   type CommandProcessingResult = ErrorImpl \/ EventImpl
   type ProcessCommand = CommandImpl => CommandProcessingResult
@@ -34,7 +31,7 @@ trait AggregateRoot[State, Office] {
   def processFirstCommand: ProcessFirstCommand
   def applyFirstEvent: ApplyFirstEvent
 
-  def raise(e: EventImpl): CommandProcessingResult = e.right
+  def accept(e: EventImpl): CommandProcessingResult = e.right
   def reject(e: ErrorImpl): CommandProcessingResult = e.left
 }
 
@@ -46,8 +43,7 @@ object AggregateRoot {
   }
 }
 
-abstract class AggregateRootActorFactory[A <: AggregateRootActor[_, _, _, _, _]]
-  extends BusinessEntityActorFactory[A] {
+abstract class AggregateRootActorFactory[A] extends BusinessEntityActorFactory[A] {
   def props(pc: PassivationConfig): Props
   def inactivityTimeout: Duration = 1.minute
 }
