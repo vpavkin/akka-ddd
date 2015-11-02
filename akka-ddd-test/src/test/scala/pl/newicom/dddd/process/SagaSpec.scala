@@ -75,7 +75,7 @@ class SagaSpec extends TestKit(TestConfig.testSystem) with WordSpecLike with Imp
   }
 
   def toEventMessage(e: ValueChanged): EventMessage[DomainEvent] = {
-    new EventMessage(e).withMetaData(Map(
+    new EventMessage(e).addMetaDataContent(Map(
       CorrelationId -> processId,
       DeliveryId -> 1L
     ))

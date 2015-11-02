@@ -37,7 +37,7 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
     def eventSource: Source[EventReceived, Unit] = {
       def withMetaData(eventData: EventData): EventMessage[DomainEvent] = {
         val em = toEventMessage(eventData).get
-        em.withMetaData(metaDataProvider(em))
+        em.addMetaData(metaDataProvider(em))
       }
       val streamId = StreamNameResolver.streamId(stream)
       log.debug(s"Subscribing to $streamId from position $fromPosExcl (exclusive)")

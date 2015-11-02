@@ -92,7 +92,7 @@ abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](im
 
 
   private def raise(event: Ev) {
-    persist(new EventMessage(event).causedBy(commandMessage)) { persisted =>
+    persist(EventMessage(event).causedBy(commandMessage)) { persisted =>
       log.info("Event persisted: {}", event)
       updateState(persisted)
       handle(sender(), toDomainEventMessage(persisted))
@@ -107,8 +107,8 @@ abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](im
   }
 
   def toDomainEventMessage(persisted: EventMessage[Ev]): DomainEventMessage[Ev] =
-    new DomainEventMessage(persisted, AggregateSnapshotId(id, lastSequenceNr))
-      .withMetaData(persisted.metadata)
+    DomainEventMessage(persisted, AggregateSnapshotId(id, lastSequenceNr))
+      .addMetaData(persisted.metadata)
 
   override def handle(senderRef: ActorRef, eventMessage: DomainEventMessage[Ev]) {
     acknowledgeCommandProcessed(commandMessage, Success(eventMessage.event.right[Er]))

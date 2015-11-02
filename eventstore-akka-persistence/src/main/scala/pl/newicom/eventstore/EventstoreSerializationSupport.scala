@@ -77,7 +77,7 @@ trait EventstoreSerializationSupport {
     fromEvent(eventData, classOf[PersistentRepr]).map { pr =>
       val em = pr.payload.asInstanceOf[EventMessage[DomainEvent]]
       val aggrSnapId = new AggregateSnapshotId(pr.persistenceId, pr.sequenceNr)
-      new DomainEventMessage(em, aggrSnapId).withMetaData(em.metadata)
+      DomainEventMessage(em, aggrSnapId).addMetaData(em.metadata)
     }
 
   def toEventMessage(eventData: EventData): Try[EventMessage[DomainEvent]] = {
@@ -87,16 +87,15 @@ trait EventstoreSerializationSupport {
   }
 
   private def toPayloadAndMetadata(em: EventMessage[DomainEvent]): (DomainEvent, Option[MetaData]) =
-    (em.event, em.withMetaData(Map("id" -> em.id, "timestamp" -> em.timestamp)).metadata)
+    (em.event, em.addMetaDataContent(Map("id" -> em.id, "timestamp" -> em.timestamp)).metadata)
 
   private def fromPayloadAndMetadata(payload: AnyRef, maybeMetadata: Option[MetaData]): EventMessage[DomainEvent] = {
-    if (maybeMetadata.isDefined) {
-      val metadata = maybeMetadata.get
+    maybeMetadata.map { metadata =>
       val id: EntityId = metadata.get("id")
       val timestamp = DateTime.parse(metadata.get("timestamp"))
-      new EventMessage(payload, id, timestamp).withMetaData(Some(metadata))
-    } else {
-      new EventMessage(payload)
+      EventMessage(payload, id, timestamp).addMetaData(Some(metadata))
+    } getOrElse {
+      EventMessage(payload)
     }
   }
 
