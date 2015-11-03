@@ -48,14 +48,12 @@ abstract class AggregateRootActorFactory[A] extends BusinessEntityActorFactory[A
   def inactivityTimeout: Duration = 1.minute
 }
 
-abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](implicit as: AggregateRoot.Aux[S, O, Cm, Ev, Er], officeInfo: OfficeInfo[O], ev: ClassTag[Ev], cm: ClassTag[Cm])
+abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](implicit behavior: AggregateRoot.Aux[S, O, Cm, Ev, Er], officeInfo: OfficeInfo[O], ev: ClassTag[Ev], cm: ClassTag[Cm])
   extends BusinessEntity with GracefulPassivation with PersistentActor
   with EventHandler[Ev] with Deduplication with ActorLogging {
 
-
-
   private var stateOpt: Option[S] = None
-  private var _lastCommandMessage: Option[CommandMessage] = None
+  private var lastCommandMessage: Option[CommandMessage] = None
 
   override def persistenceId: String = s"${officeInfo.name}-$id"
   override def id = self.path.name
@@ -64,34 +62,29 @@ abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](im
     case em: EventMessage[Ev] => updateState(em)
   }
 
-  override def preRestart(reason: Throwable, msgOpt: Option[Any]) {
-    acknowledgeCommandProcessed(commandMessage, Failure(reason))
-    super.preRestart(reason, msgOpt)
-  }
-
   override def receive: Receive = receiveDuplicate(commandDuplicated).orElse(receiveCommand)
 
   override def receiveCommand: Receive = {
     case commandMessage: CommandMessage =>
       log.debug(s"Received: $commandMessage")
-      _lastCommandMessage = Some(commandMessage)
+      lastCommandMessage = Some(commandMessage)
       commandMessage.command match {
-        case command: Cm => handleCommand(command)
+        case command: Cm => handleCommand(commandMessage)(command)
         case other => unhandled(other)
       }
   }
 
-  def commandMessage = _lastCommandMessage.get
-
-  def handleCommand: Cm => Unit = { command =>
-    val processingResult = stateOpt.map(state => as.processCommand(state)(command)).getOrElse(as.processFirstCommand(command))
-    processingResult.map { event =>
-      raise(event)
-    }.leftMap(_.left[Ev]).valueOr(acknowledgeCommand)
+  def handleCommand(commandMessage: CommandMessage): Cm => Unit = { command =>
+    stateOpt
+      .map(state => behavior.processCommand(state)(command))
+      .getOrElse(behavior.processFirstCommand(command))
+      .map(raise(commandMessage))
+      .leftMap(_.left[Ev])
+      .valueOr(acknowledgeCommand(commandMessage))
   }
 
 
-  private def raise(event: Ev) {
+  private def raise(commandMessage: CommandMessage)(event: Ev) {
     persist(EventMessage(event).causedBy(commandMessage)) { persisted =>
       log.info("Event persisted: {}", event)
       updateState(persisted)
@@ -101,7 +94,7 @@ abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](im
 
   def updateState(persisted: EventMessage[Ev]) {
     val event = persisted.event
-    val nextState = stateOpt.map(state => as.applyEvent(state)(event)).getOrElse(as.applyFirstEvent(event))
+    val nextState = stateOpt.map(state => behavior.applyEvent(state)(event)).getOrElse(behavior.applyFirstEvent(event))
     stateOpt = Option(nextState)
     messageProcessed(persisted)
   }
@@ -111,18 +104,19 @@ abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](im
       .addMetadata(persisted.metadata)
 
   override def handle(senderRef: ActorRef, eventMessage: DomainEventMessage[Ev]) {
-    acknowledgeCommandProcessed(commandMessage, Success(eventMessage.event.right[Er]))
+    lastCommandMessage.foreach(acknowledgeCommandProcessed(Success(eventMessage.event.right[Er])))
   }
 
-  def acknowledgeCommand(result: Er \/ Ev) = acknowledgeCommandProcessed(commandMessage, Success(result))
+  def acknowledgeCommand(commandMessage: CommandMessage)(result: Er \/ Ev) =
+    acknowledgeCommandProcessed(Success(result))(commandMessage)
 
-  def acknowledgeCommandProcessed(msg: Message, result: Try[Any] = Success("Ok")) {
+  def acknowledgeCommandProcessed(result: Try[Any] = Success("Ok"))(msg: Message) {
     val deliveryReceipt = msg.deliveryReceipt(result)
     sender() ! deliveryReceipt
     log.debug(s"Delivery receipt (for received command) sent ($deliveryReceipt)")
   }
 
-  private def commandDuplicated(msg: Message) = acknowledgeCommandProcessed(msg)
+  private def commandDuplicated(msg: Message) = acknowledgeCommandProcessed()(msg)
 
   val pc: PassivationConfig
 }
