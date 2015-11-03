@@ -8,7 +8,7 @@ import eventstore.Content._
 import eventstore.{Content, ContentType, EventData}
 import org.joda.time.DateTime
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.messaging.MetaData
+import pl.newicom.dddd.messaging.Metadata
 import pl.newicom.dddd.messaging.event.{AggregateSnapshotId, DomainEventMessage, EventMessage}
 import pl.newicom.dddd.serialization.JsonSerHints._
 import pl.newicom.eventstore.json.JsonSerializerExtension
@@ -64,7 +64,7 @@ trait EventstoreSerializationSupport {
         case pr: PersistentRepr =>
           val mdOpt = event.metadata.value match {
             case bs: ByteString if bs.isEmpty => None
-            case bs: ByteString               => Some(deserialize(bs.toArray, classOf[MetaData]))
+            case bs: ByteString               => Some(deserialize(bs.toArray, classOf[Metadata]))
           }
           pr.withPayload(fromPayloadAndMetadata(pr.payload.asInstanceOf[AnyRef], mdOpt))
         case _ => result
@@ -77,7 +77,7 @@ trait EventstoreSerializationSupport {
     fromEvent(eventData, classOf[PersistentRepr]).map { pr =>
       val em = pr.payload.asInstanceOf[EventMessage[DomainEvent]]
       val aggrSnapId = new AggregateSnapshotId(pr.persistenceId, pr.sequenceNr)
-      DomainEventMessage(em, aggrSnapId).addMetaData(em.metadata)
+      DomainEventMessage(em, aggrSnapId).addMetadata(em.metadata)
     }
 
   def toEventMessage(eventData: EventData): Try[EventMessage[DomainEvent]] = {
@@ -86,14 +86,14 @@ trait EventstoreSerializationSupport {
     }
   }
 
-  private def toPayloadAndMetadata(em: EventMessage[DomainEvent]): (DomainEvent, Option[MetaData]) =
-    (em.event, em.addMetaDataContent(Map("id" -> em.id, "timestamp" -> em.timestamp)).metadata)
+  private def toPayloadAndMetadata(em: EventMessage[DomainEvent]): (DomainEvent, Option[Metadata]) =
+    (em.event, em.addMetadataContent(Map("id" -> em.id, "timestamp" -> em.timestamp)).metadata)
 
-  private def fromPayloadAndMetadata(payload: AnyRef, maybeMetadata: Option[MetaData]): EventMessage[DomainEvent] = {
+  private def fromPayloadAndMetadata(payload: AnyRef, maybeMetadata: Option[Metadata]): EventMessage[DomainEvent] = {
     maybeMetadata.map { metadata =>
       val id: EntityId = metadata.get("id")
       val timestamp = DateTime.parse(metadata.get("timestamp"))
-      EventMessage(payload, id, timestamp).addMetaData(Some(metadata))
+      EventMessage(payload, id, timestamp).addMetadata(Some(metadata))
     } getOrElse {
       EventMessage(payload)
     }

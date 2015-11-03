@@ -2,8 +2,8 @@ package pl.newicom.dddd.messaging.event
 
 import org.joda.time.DateTime
 import pl.newicom.dddd.aggregate.DomainEvent
-import pl.newicom.dddd.messaging.MetaData.CorrelationId
-import pl.newicom.dddd.messaging.{MetaData, EntityMessage, Message}
+import pl.newicom.dddd.messaging.Metadata.CorrelationId
+import pl.newicom.dddd.messaging.{Metadata, EntityMessage, Message}
 import pl.newicom.dddd.utils.UUIDSupport._
 
 object EventMessage {
@@ -11,7 +11,7 @@ object EventMessage {
     Some(em.id, em.event)
   }
 
-  def apply[E <: DomainEvent](event0: E, id0: String = uuid, timestamp0: DateTime = new DateTime, metaData0: Option[MetaData] = None): EventMessage[E] = new EventMessage[E] {
+  def apply[E <: DomainEvent](event0: E, id0: String = uuid, timestamp0: DateTime = new DateTime, metaData0: Option[Metadata] = None): EventMessage[E] = new EventMessage[E] {
 
     override def event: E = event0
 
@@ -21,9 +21,9 @@ object EventMessage {
 
     override type MessageImpl = EventMessage[E]
 
-    override def metadata: Option[MetaData] = metaData0
+    override def metadata: Option[Metadata] = metaData0
 
-    override def copyWithMetaData(newMetaData: Option[MetaData]): MessageImpl = EventMessage(event, id, timestamp, newMetaData)
+    def copyWithMetadata(newMetaData: Option[Metadata]): MessageImpl = EventMessage(event, id, timestamp, newMetaData)
   }
 }
 

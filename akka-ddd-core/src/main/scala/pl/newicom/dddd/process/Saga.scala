@@ -6,7 +6,7 @@ import org.joda.time.DateTime
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, GracefulPassivation, PassivationConfig}
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.alod._
-import pl.newicom.dddd.messaging.MetaData.DeliveryId
+import pl.newicom.dddd.messaging.Metadata.DeliveryId
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.event.EventMessage
 import pl.newicom.dddd.messaging.{Deduplication, Message}

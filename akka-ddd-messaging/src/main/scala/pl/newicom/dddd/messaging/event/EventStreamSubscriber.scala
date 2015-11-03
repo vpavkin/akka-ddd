@@ -2,7 +2,7 @@ package pl.newicom.dddd.messaging.event
 
 import pl.newicom.dddd.aggregate.DomainEvent
 import akka.actor.Actor
-import pl.newicom.dddd.messaging.MetaData
+import pl.newicom.dddd.messaging.Metadata
 import pl.newicom.dddd.messaging.event.EventStreamSubscriber._
 
 object EventStreamSubscriber {
@@ -29,5 +29,5 @@ trait EventStreamSubscriber {
    */
   def subscribe(stream: EventStream, fromPositionExclusive: Option[Long]): InFlightMessagesCallback
 
-  def metaDataProvider(em: EventMessage[DomainEvent]): Option[MetaData]
+  def metaDataProvider(em: EventMessage[DomainEvent]): Option[Metadata]
 }

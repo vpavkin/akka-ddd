@@ -84,7 +84,7 @@ abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](im
   def commandMessage = _lastCommandMessage.get
 
   def handleCommand: Cm => Unit = { command =>
-    val processingResult = initialized ? as.processCommand(state)(command) | as.processFirstCommand(command)
+    val processingResult = stateOpt.map(state => as.processCommand(state)(command)).getOrElse(as.processFirstCommand(command))
     processingResult.map { event =>
       raise(event)
     }.leftMap(_.left[Ev]).valueOr(acknowledgeCommand)
@@ -101,22 +101,18 @@ abstract class AggregateRootActor[S, O, Cm <: Command, Ev <: DomainEvent, Er](im
 
   def updateState(persisted: EventMessage[Ev]) {
     val event = persisted.event
-    val nextState = if (initialized) as.applyEvent(state)(event) else as.applyFirstEvent(event)
+    val nextState = stateOpt.map(state => as.applyEvent(state)(event)).getOrElse(as.applyFirstEvent(event))
     stateOpt = Option(nextState)
     messageProcessed(persisted)
   }
 
   def toDomainEventMessage(persisted: EventMessage[Ev]): DomainEventMessage[Ev] =
     DomainEventMessage(persisted, AggregateSnapshotId(id, lastSequenceNr))
-      .addMetaData(persisted.metadata)
+      .addMetadata(persisted.metadata)
 
   override def handle(senderRef: ActorRef, eventMessage: DomainEventMessage[Ev]) {
     acknowledgeCommandProcessed(commandMessage, Success(eventMessage.event.right[Er]))
   }
-
-  def initialized = stateOpt.isDefined
-
-  def state = if (initialized) stateOpt.get else throw new AggregateRootNotInitializedException
 
   def acknowledgeCommand(result: Er \/ Ev) = acknowledgeCommandProcessed(commandMessage, Success(result))
 

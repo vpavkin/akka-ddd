@@ -7,7 +7,7 @@ import pl.newicom.dddd.aggregate.{DomainEvent, EntityId}
 import pl.newicom.dddd.delivery.{DeliveryState, AtLeastOnceDeliverySupport}
 import pl.newicom.dddd.messaging.event.EventStreamSubscriber.{InFlightMessagesCallback, EventReceived}
 import pl.newicom.dddd.messaging.event._
-import pl.newicom.dddd.messaging.{Message, MetaData}
+import pl.newicom.dddd.messaging.{Message, Metadata}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.process.ReceptorConfig.{ReceiverResolver, StimuliSource, Transduction}
 import pl.newicom.dddd.persistence.{RegularSnapshottingConfig, RegularSnapshotting, ForgettingParticularEvents}
@@ -95,7 +95,7 @@ abstract class Receptor extends AtLeastOnceDeliverySupport with ReceptorPersiste
 
 
 
-  def metaDataProvider(em: EventMessage[DomainEvent]): Option[MetaData] = None
+  def metaDataProvider(em: EventMessage[DomainEvent]): Option[Metadata] = None
 
   def receiveEvent: Receive = {
     case EventReceived(em, position) =>

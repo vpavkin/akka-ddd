@@ -2,7 +2,7 @@ package pl.newicom.dddd.messaging.event
 
 import org.joda.time.DateTime
 import pl.newicom.dddd.aggregate.DomainEvent
-import pl.newicom.dddd.messaging.MetaData
+import pl.newicom.dddd.messaging.Metadata
 import pl.newicom.dddd.utils.UUIDSupport._
 
 
@@ -15,7 +15,7 @@ case class DomainEventMessage[E <: DomainEvent](
     event: E,
     id: String = uuid,
     timestamp: DateTime = new DateTime,
-    metadata: Option[MetaData] = None)
+    metadata: Option[Metadata] = None)
   extends EventMessage[E] {
 
   override type MessageImpl = DomainEventMessage[E]
@@ -24,7 +24,7 @@ case class DomainEventMessage[E <: DomainEvent](
 
 
 
-  override def copyWithMetaData(m: Option[MetaData]): DomainEventMessage[E] = copy(metadata = m)
+  override def copyWithMetadata(m: Option[Metadata]): DomainEventMessage[E] = copy(metadata = m)
 
   def aggregateId = snapshotId.aggregateId
 
