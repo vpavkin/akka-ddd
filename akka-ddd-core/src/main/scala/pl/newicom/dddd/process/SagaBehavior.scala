@@ -27,20 +27,20 @@ object TestOffice {
   }
 }
 
-trait TestOffice2
+trait NotificationOffice
 
-case class OpenOffice2(aggregateId: String) extends Command
+case class Notify(aggregateId: String) extends Command
 
-case class OfficeOpened2(aggregateId: String) extends DomainEvent
+case class Notified(aggregateId: String) extends DomainEvent
 
-trait TOC2 extends Contract[TestOffice2] {
-  override type CommandImpl = OpenOffice2
+trait TOC2 extends Contract[NotificationOffice] {
+  override type CommandImpl = Notify
   override type ErrorImpl = String
-  override type EventImpl = OfficeOpened2
+  override type EventImpl = Notified
 }
 
-object TestOffice2 {
-  implicit val state = new OfficeInfo[TestOffice2] with TOC2 {
+object NotificationOffice {
+  implicit val state = new OfficeInfo[NotificationOffice] with TOC2 {
     override def name: String = "test"
   }
 }
@@ -55,26 +55,49 @@ object OfficePath {
   }
 }
 
-trait InputHandler[B, S, In] {
+trait Handler[B, S, In] {
   def handle(state: S): In => Reaction[S]
 }
 
-object InputHandler {
-  implicit def cnil[B, S]: InputHandler[B, S, CNil] = new InputHandler[B, S, CNil] {
+object Handler {
+  implicit def cnil[B, S]: Handler[B, S, CNil] = new Handler[B, S, CNil] {
     def handle(s: S) = Function.const(DoNothing)
   }
 
   implicit def ccons[B, S, H, T <: Coproduct]
   (implicit
-   fh: InputHandler[B, S, H],
-   mt: InputHandler[B, S, T]): InputHandler[B, S, H :+: T] =
-    new InputHandler[B, S, H :+: T] {
+   fh: Handler[B, S, H],
+   mt: Handler[B, S, T]): Handler[B, S, H :+: T] =
+    new Handler[B, S, H :+: T] {
       def handle(s: S) =  {
         case Inl(h) => fh.handle(s)(h)
         case Inr(t) => mt.handle(s)(t)
       }
     }
 }
+
+trait Init[B, S, In] {
+  def init: In => Reaction[S]
+}
+
+object Init {
+  implicit def cnil[B, S]: Init[B, S, CNil] = new Init[B, S, CNil] {
+    def init = Function.const(DoNothing)
+  }
+
+  implicit def ccons[B, S, H, T <: Coproduct]
+  (implicit
+   fh: Init[B, S, H],
+   mt: Init[B, S, T]): Init[B, S, H :+: T] =
+    new Init[B, S, H :+: T] {
+      def init = {
+        case Inl(h) => fh.init(h)
+        case Inr(t) => mt.init(t)
+      }
+    }
+}
+
+
 
 sealed trait Reaction[+S] {
   def and[S1 >: S](reaction: Reaction[S1]): Reaction[S1] = And(this, reaction)
@@ -85,36 +108,38 @@ case class And[+S](first: Reaction[S], second: Reaction[S]) extends Reaction[S]
 case object DoNothing extends Reaction[Nothing]
 
 
-trait SagaBehavior[Saga, Self <: SagaBehavior[Saga, Self]] { this: Self =>
+trait SagaBehavior[Saga, Self <: SagaBehavior[Saga, Self]] { self: Self =>
 
   type S
 
   type Evt <: Coproduct
 
-  type Err <: Coproduct
+  type H[In] = Handler[Self, S, In]
+  type I[In] = Init[Self, S, In]
 
-  type IH[In] = InputHandler[Self, S, In]
-
-  def handle[In](f: S => In => Reaction[S]): IH[In] = new IH[In] {
+  def handle[In](f: S => In => Reaction[S]): H[In] = new H[In] {
     override def handle(state: S): (In) => Reaction[S] = f(state)
   }
 
-  implicit def stateToChangeState(s: S): Reaction[S] = ChangeState(s)
-
-  trait DeliverF[O] {
-    def apply[Cm <: Command, Ev <: DomainEvent, Er](command: Cm)(implicit officeInfo: OfficeInfo.Aux[O, Cm, Ev, Er], eventHandler: IH[Ev], errorHandler: IH[Er], path: OfficePath[O]): Reaction[S]
+  def init[In](f: In => Reaction[S]): I[In] = new I[In] {
+    override def init: (In) => Reaction[S] = f
   }
 
-  def sendTo[O] = new DeliverF[O] {
-    override def apply[Cm <: Command, Ev <: DomainEvent, Er](command: Cm)(implicit officeInfo: OfficeInfo.Aux[O, Cm, Ev, Er], eventHandler: IH[Ev], errorHandler: IH[Er], path: OfficePath[O]): Reaction[S] = SendCommand(path, command)
+  trait SendTo[O] {
+    def apply[Cm <: Command, Ev <: DomainEvent, Er](command: Cm)(implicit officeInfo: OfficeInfo.Aux[O, Cm, Ev, Er], eventHandler: H[Ev], errorHandler: H[Er], path: OfficePath[O]): Reaction[S]
   }
+
+  def sendTo[O] = new SendTo[O] {
+    override def apply[Cm <: Command, Ev <: DomainEvent, Er](command: Cm)(implicit officeInfo: OfficeInfo.Aux[O, Cm, Ev, Er], eventHandler: H[Ev], errorHandler: H[Er], path: OfficePath[O]): Reaction[S] = SendCommand(path, command)
+  }
+
+  def changeState(newState: S): Reaction[S] = ChangeState(newState)
 }
 
 object SagaBehavior {
-  type Aux[Saga, State0, Evt0 <: Coproduct, Err0 <: Coproduct, Self <: SagaBehavior[Saga, Self]] = SagaBehavior[Saga, Self] {
+  type Aux[Saga, State0, Evt0 <: Coproduct, Self <: SagaBehavior[Saga, Self]] = SagaBehavior[Saga, Self] {
     type State = State0
     type Evt = Evt0
-    type Err = Err0
   }
 }
 
@@ -133,32 +158,30 @@ object AnyInject {
   }
 }
 
-
 object SagaActor {
   trait Create[Saga] {
-    def apply[S, Evt <: Coproduct, Err <: Coproduct, Self <: SagaBehavior[Saga, Self]]()(implicit a0: SagaBehavior.Aux[Saga, S, Evt, Err, Self], handler: InputHandler[Self, S, Evt], inject: AnyInject[Evt]) = new SagaActor
+    def apply[State, In <: Coproduct, Self <: SagaBehavior.Aux[Saga, State, In, Self]]()(implicit a0: SagaBehavior.Aux[Saga, State, In, Self], handler: Handler[Self, State, In], inject: AnyInject[In]): SagaActor[State, In, Saga, Self]
   }
 
   def create[Saga] = new Create[Saga] {
-
+    def apply[State, In <: Coproduct, Self <: SagaBehavior.Aux[Saga, State, In, Self]]()(implicit a0: SagaBehavior.Aux[Saga, State, In, Self], handler: Handler[Self, State, In], inject: AnyInject[In]): SagaActor[State, In, Saga, Self] = new SagaActor
   }
 }
 
-class SagaActor[S, Evt <: Coproduct, Err <: Coproduct, Saga, Self <: SagaBehavior[Saga, Self]](implicit a0: SagaBehavior.Aux[Saga, S, Evt, Err, Self], handler: InputHandler[Self, S, Evt], inject: AnyInject[Evt]) {
+class SagaActor[State, In <: Coproduct, Saga, Self](implicit handler: Handler[Self, State, In], inject: AnyInject[In]) {
 
-  var s: S = ???
+  var s: State = ???
+
+  def handleInput(s: State)(in: Any): Option[Reaction[State]] = inject(in).map(handler.handle(s))
 
   def receive: Any => Unit = { in =>
-
-    def maybeHandleInput(s: S)(in: Any): Option[Reaction[S]] = inject(in).map(handler.handle(s))
-
-    maybeHandleInput(s)(in) match {
+    handleInput(s)(in) match {
       case Some(reaction) => runReaction(reaction)
       case None => unhandled(in)
     }
   }
 
-  def runReaction(reaction: Reaction[S]): Unit = ???
+  def runReaction(reaction: Reaction[State]): Unit = ???
 
   def unhandled(a: Any): Unit = ???
 }
@@ -166,30 +189,27 @@ class SagaActor[S, Evt <: Coproduct, Err <: Coproduct, Saga, Self <: SagaBehavio
 trait SomeSaga
 
 object SomeSaga {
-  implicit def behavior: SagaBehavior[SomeSaga, SomeSagaBehavior] = new SomeSagaBehavior
+  def behavior[Self <: SagaBehavior.Aux[Saga, String, OfficeOpened :+: Notified :+: CNil, Self]](implicit testOffice2: OfficePath[NotificationOffice], testOffice: OfficePath[TestOffice]): SagaBehavior.Aux[SomeSaga,String, OfficeOpened :+: Notified :+: CNil, Self] = new SomeSagaBehavior
 }
 
-class SomeSagaBehavior extends SagaBehavior[SomeSaga, SomeSagaBehavior] {
+class SomeSagaBehavior(implicit testOffice2: OfficePath[NotificationOffice], testOffice: OfficePath[TestOffice]) extends SagaBehavior[SomeSaga, SomeSagaBehavior] {
   override type S = String
-  override type Evt = OfficeOpened :+: OfficeOpened2 :+: CNil
-  override type Err = String :+: CNil
-
-  implicit val testOffice2Path = OfficePath[TestOffice2](null)
-  implicit val testOfficePath = OfficePath[TestOffice](null)
+  override type Evt = OfficeOpened :+: Notified :+: CNil
 
   implicit def eventsFromOffice1 = handle[OfficeOpened] { state => {
-    e: OfficeOpened => "ssa" and sendTo[TestOffice2](OpenOffice2(e.aggregateId))
+    e: OfficeOpened => changeState("opened") and sendTo[NotificationOffice](Notify(e.aggregateId))
   }}
 
-  implicit def errors: IH[String] = handle[String] { state => {
+  implicit def errors: H[String] = handle[String] { state => {
     case error => DoNothing
   }}
 
-  implicit def eventsFromOffice2: IH[OfficeOpened2] = handle[OfficeOpened2] { state => {
-    case OfficeOpened2(a) => sendTo[TestOffice](OpenOffice(a))
+  implicit def eventsFromOffice2: H[Notified] = handle[Notified] { state => {
+    case Notified(a) => sendTo[TestOffice](OpenOffice(a))
   }}
 }
 
 object Test {
-  SagaActor.create[SomeSaga]
+  implicit val behavior = SomeSaga.behavior(OfficePath[NotificationOffice](null), OfficePath[TestOffice](null))
+  SagaActor.create[SomeSaga]()
 }
