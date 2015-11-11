@@ -2,26 +2,26 @@ package pl.newicom.dddd.messaging
 
 import pl.newicom.dddd.aggregate.EntityId
 import pl.newicom.dddd.delivery.protocol.{Receipt, Processed, alod}
-import pl.newicom.dddd.messaging.Metadata._
+import pl.newicom.dddd.messaging.MetaData._
 
 import scala.util.{Success, Try}
 
-object Metadata {
+object MetaData {
   val DeliveryId          = "_deliveryId"
   val CausationId         = "causationId"
   val CorrelationId       = "correlationId"
   val SessionId           = "sessionId"
 
-  def empty: Metadata = Metadata(Map.empty)
+  def empty: MetaData = MetaData(Map.empty)
 }
 
-case class Metadata(content: Map[String, Any]) extends Serializable {
+case class MetaData(content: Map[String, Any]) extends Serializable {
 
-  def mergeWithMetadata(metadata: Option[Metadata]): Metadata = {
+  def mergeWithMetadata(metadata: Option[MetaData]): MetaData = {
     metadata.map(_.content).map(addContent).getOrElse(this)
   }
 
-  def addContent(content: Map[String, Any]): Metadata = {
+  def addContent(content: Map[String, Any]): MetaData = {
     copy(content = this.content ++ content)
   }
 
@@ -31,9 +31,9 @@ case class Metadata(content: Map[String, Any]) extends Serializable {
 
   def tryGet[B](attrName: String): Option[B] = content.get(attrName).asInstanceOf[Option[B]]
 
-  def exceptDeliveryAttributes: Option[Metadata] = {
+  def exceptDeliveryAttributes: Option[MetaData] = {
     val resultMap = content.filterKeys(a => !a.startsWith("_"))
-    if (resultMap.isEmpty) None else Some(Metadata(resultMap))
+    if (resultMap.isEmpty) None else Some(MetaData(resultMap))
   }
 
   override def toString: String = content.toString()
@@ -45,23 +45,23 @@ trait Message extends Serializable {
 
   type MessageImpl <: Message
 
-  def copyWithMetadata(m: Option[Metadata]): MessageImpl
-  def metadata: Option[Metadata]
+  def copyWithMetadata(m: Option[MetaData]): MessageImpl
+  def metadata: Option[MetaData]
 
   def causedBy(msg: Message): MessageImpl =
     addMetadata(msg.metadataExceptDeliveryAttributes)
       .withCausationId(msg.id).asInstanceOf[MessageImpl]
 
-  def metadataExceptDeliveryAttributes: Option[Metadata] = {
+  def metadataExceptDeliveryAttributes: Option[MetaData] = {
     metadata.flatMap(_.exceptDeliveryAttributes)
   }
 
-  def addMetadata(metadata: Option[Metadata]): MessageImpl = {
+  def addMetadata(metadata: Option[MetaData]): MessageImpl = {
     copyWithMetadata(this.metadata.map(_.mergeWithMetadata(metadata)).orElse(metadata))
   }
 
   def addMetadataContent(metadataContent: Map[String, Any]): MessageImpl = {
-    addMetadata(Some(Metadata(metadataContent)))
+    addMetadata(Some(MetaData(metadataContent)))
   }
 
   def withMetaAttribute(attrName: String, value: Any): MessageImpl = addMetadataContent(Map(attrName.toString -> value))

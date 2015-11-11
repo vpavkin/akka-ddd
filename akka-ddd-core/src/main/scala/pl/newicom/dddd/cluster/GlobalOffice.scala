@@ -24,7 +24,7 @@ trait GlobalOffice {
   ): OfficeFactory[S] = {
     new OfficeFactory[S] {
 
-      override def officeName: EntityId = officeInfo.name
+      def officeName: EntityId = officeInfo.name
 
       val shardSettings = ClusterShardingSettings(system)
 
@@ -55,7 +55,6 @@ trait GlobalOffice {
           extractShardId = sr.shardResolver)
 
         ClusterClientReceptionist(system).registerService(region.get)
-
       }
 
     }

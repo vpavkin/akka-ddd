@@ -1,42 +1,34 @@
-package pl.newicom.dddd.process
+package pl.newicom.dddd.process.typesafe
 
-import akka.actor.{ActorLogging, ActorPath, Props}
-import akka.persistence.{AtLeastOnceDelivery, PersistentActor, RecoveryCompleted}
+import akka.actor.{ActorPath, ActorLogging}
+import akka.persistence.{RecoveryCompleted, AtLeastOnceDelivery, PersistentActor}
 import org.joda.time.DateTime
-import pl.newicom.dddd.actor.{BusinessEntityActorFactory, GracefulPassivation, PassivationConfig}
+import pl.newicom.dddd.actor.{PassivationConfig, GracefulPassivation}
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.delivery.protocol.alod._
-import pl.newicom.dddd.messaging.MetaData.DeliveryId
+import pl.newicom.dddd.delivery.protocol.alod.{Processed, Delivered}
+import pl.newicom.dddd.messaging.MetaData._
 import pl.newicom.dddd.messaging.command.CommandMessage
+import pl.newicom.dddd.messaging.{Message, Deduplication}
 import pl.newicom.dddd.messaging.event.EventMessage
-import pl.newicom.dddd.messaging.{Deduplication, Message}
-import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.scheduling.ScheduleEvent
+import shapeless.Coproduct
 
-abstract class SagaActorFactory[A <: Saga] extends BusinessEntityActorFactory[A] {
-  import scala.concurrent.duration._
+object SagaActor {
+  trait Create[Saga] {
+    def apply[State, In <: Coproduct, C <: Coproduct](a0: SagaBehavior[Saga, State, In, C])(implicit handler: Apply[a0.type, State, In], injectIn: InjectAny[In], init: ApplyFirst[a0.type, State, C], injectC: InjectAny[C]): SagaActor[a0.type, State, In, C]
+  }
 
-  def props(pc: PassivationConfig): Props
-  def inactivityTimeout: Duration = 1.minute
+  def create[Saga] = new Create[Saga] {
+    def apply[State, In <: Coproduct, C <: Coproduct](a0: SagaBehavior[Saga, State, In, C])(implicit handler: Apply[a0.type, State, In], injectIn: InjectAny[In], init: ApplyFirst[a0.type, State, C], injectC: InjectAny[C]): SagaActor[a0.type, State, In, C] = new SagaActor
+  }
 }
 
-/**
- * @param bpsName name of Business Process Stream (bps)
- */
-abstract class SagaConfig[A <: Saga](val bpsName: String) extends OfficeInfo[A] {
+class SagaActor[B, State, In <: Coproduct, C <: Coproduct](implicit handler: Apply[B, State, In], init: ApplyFirst[B, State, C], injectIn: InjectAny[In], injectC: InjectAny[C]) extends BusinessEntity with GracefulPassivation with PersistentActor
+with Deduplication with AtLeastOnceDelivery with ActorLogging {
 
-  def name = bpsName
+  var stateOpt: Option[State] = None
 
-  /**
-   * Correlation ID identifies process instance. It is used to route EventMessage
-   * messages created by [[SagaManager]] to [[Saga]] instance,
-   */
-  def correlationIdResolver: PartialFunction[DomainEvent, EntityId]
-
-}
-
-trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
-  with Deduplication with AtLeastOnceDelivery with ActorLogging {
+  val pc = PassivationConfig()
 
   def sagaId = self.path.name
 
@@ -50,9 +42,6 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
 
   private var _lastEventMessage: Option[EventMessage[DomainEvent]] = None
 
-  /**
-   * Event message being processed. Not available during recovery
-   */
   def eventMessage = _lastEventMessage.get
 
   override def aroundReceive(receive: Receive, msg: Any): Unit = {
@@ -83,24 +72,8 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
     }
   }
 
-  /**
-   * Defines business process logic (state transitions).
-   * State transition happens when raise(event) is called.
-   * No state transition indicates the current event message could have been received out-of-order.
-   */
-  def receiveEvent: Receive
+  def receiveEvent: Receive = ???
 
-  override def receiveRecover: Receive = {
-    case rc: RecoveryCompleted =>
-      // do nothing
-    case msg: Any =>
-      updateState(msg)
-
-  }
-
-  /**
-   * Triggers state transition
-   */
   def raise(em: EventMessage[DomainEvent]): Unit =
     persist(em) { persisted =>
       log.debug("Event message persisted: {}", persisted)
@@ -108,19 +81,29 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
       acknowledgeEvent(persisted)
     }
 
-  /**
-   * Event handler called on state transition
-   */
-  def applyEvent: PartialFunction[DomainEvent, Unit]
+  override def receiveRecover: Receive = {
+    case rc: RecoveryCompleted =>
+    case msg: Any => updateState(msg)
+  }
 
   private def updateState(msg: Any): Unit = msg match {
     case em: EventMessage[_] =>
+      _lastEventMessage = Some(em)
       messageProcessed(em)
-      applyEvent.applyOrElse(em.event, (e: DomainEvent) => ())
+      applyEvent(em.event)
     case receipt: Delivered =>
       confirmDelivery(receipt.deliveryId)
       log.debug(s"Delivery of message confirmed (receipt: $receipt)")
-      applyEvent.applyOrElse(receipt, (e: DomainEvent) => ())
+      PartialFunction.condOpt(receipt) { case p: Processed => p.result }.foreach(applyEvent)
+  }
+
+  def applyEvent: Any => Unit = { in =>
+    stateOpt.map { state =>
+      injectIn(in).map(handler(state))
+    }.getOrElse(injectC(in).map(init.apply)) match {
+      case Some(reaction) => runReaction(reaction)
+      case None => ()
+    }
   }
 
   private def acknowledgeEvent(em: Message) {
@@ -137,12 +120,17 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
     log.warning(s"Unhandled: $em") // unhandled event should be redelivered by SagaManager
   }
 
-  override def messageProcessed(m: Message): Unit = {
-    _lastEventMessage = m match {
-      case em: EventMessage[DomainEvent] =>
-        Some(em)
-      case _ => None
-    }
-    super.messageProcessed(m)
+  def runReaction(reaction: Reaction[State]): Unit = reaction match {
+    case ChangeState(s) =>
+      stateOpt = Some(s)
+
+    case SendCommand(officePath, command) =>
+      deliverCommand(officePath.value, command)
+
+    case And(f, s) =>
+      runReaction(f)
+      runReaction(s)
+
+    case Ignore => ()
   }
 }

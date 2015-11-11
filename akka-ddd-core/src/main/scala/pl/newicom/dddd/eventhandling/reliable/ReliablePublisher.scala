@@ -6,7 +6,7 @@ import akka.persistence._
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.alod.Processed
 import pl.newicom.dddd.eventhandling.EventPublisher
-import pl.newicom.dddd.messaging.Metadata.DeliveryId
+import pl.newicom.dddd.messaging.MetaData.DeliveryId
 import pl.newicom.dddd.messaging.event.{DomainEventMessage, EventMessage}
 
 import scala.collection.immutable.Seq

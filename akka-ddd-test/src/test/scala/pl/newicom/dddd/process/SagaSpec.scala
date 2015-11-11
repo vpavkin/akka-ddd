@@ -6,7 +6,7 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, WordSpecLike}
 import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.alod.Delivered
-import pl.newicom.dddd.messaging.Metadata._
+import pl.newicom.dddd.messaging.MetaData._
 import pl.newicom.dddd.messaging.event.EventMessage
 import pl.newicom.dddd.office.LocalOffice._
 import pl.newicom.dddd.office.Office._

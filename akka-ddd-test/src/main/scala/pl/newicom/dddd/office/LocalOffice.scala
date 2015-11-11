@@ -13,11 +13,12 @@ import scala.reflect.ClassTag
 
 object LocalOffice {
 
-  implicit def localOfficeFactory[A <: BusinessEntity: BusinessEntityActorFactory: EntityIdResolution : ClassTag](implicit system: ActorSystem): OfficeFactory[A] = {
+  implicit def localOfficeFactory[A <: BusinessEntity: BusinessEntityActorFactory: EntityIdResolution : ClassTag](implicit system: ActorSystem, officeInfo: OfficeInfo[A]): OfficeFactory[A] = {
     new OfficeFactory[A] {
       override def getOrCreate: ActorRef = {
         system.actorOf(Props(new LocalOffice[A]()), s"${officeName}_${uuid7}")
       }
+      override def officeName: String = officeInfo.name
     }
   }
 }

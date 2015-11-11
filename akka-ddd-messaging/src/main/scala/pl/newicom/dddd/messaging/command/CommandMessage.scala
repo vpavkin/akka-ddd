@@ -3,14 +3,14 @@ package pl.newicom.dddd.messaging.command
 import java.util.Date
 
 import pl.newicom.dddd.aggregate.{Command, EntityId}
-import pl.newicom.dddd.messaging.{Metadata, EntityMessage, Message}
+import pl.newicom.dddd.messaging.{MetaData, EntityMessage, Message}
 import pl.newicom.dddd.utils.UUIDSupport.uuid
 
 case class CommandMessage(
     command: Command,
     id: String = uuid,
     timestamp: Date = new Date,
-    metadata: Option[Metadata] = None)
+    metadata: Option[MetaData] = None)
   extends Message with EntityMessage {
 
   type MessageImpl = CommandMessage
@@ -19,7 +19,7 @@ case class CommandMessage(
 
   override def payload: Any = command
 
-  override def copyWithMetadata(m: Option[Metadata]): CommandMessage = copy(metadata = m)
+  override def copyWithMetadata(m: Option[MetaData]): CommandMessage = copy(metadata = m)
 
   override def toString: String = {
     val msgClass = getClass.getSimpleName

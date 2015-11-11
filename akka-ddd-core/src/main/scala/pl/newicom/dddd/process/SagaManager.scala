@@ -2,8 +2,8 @@ package pl.newicom.dddd.process
 
 import akka.actor.ActorPath
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.messaging.Metadata
-import pl.newicom.dddd.messaging.Metadata._
+import pl.newicom.dddd.messaging.MetaData
+import pl.newicom.dddd.messaging.MetaData._
 import pl.newicom.dddd.messaging.event.{EventMessage, EventStreamSubscriber}
 import pl.newicom.dddd.office.OfficeInfo
 import SagaManager._
@@ -34,9 +34,9 @@ class SagaManager(sagaConfig: SagaConfig[_], sagaOffice: ActorPath) extends Rece
   override def redeliverInterval = 30.seconds
   override def warnAfterNumberOfUnconfirmedAttempts = 15
 
-  override def metaDataProvider(em: EventMessage[DomainEvent]): Option[Metadata] =
+  override def metaDataProvider(em: EventMessage[DomainEvent]): Option[MetaData] =
     sagaConfig.correlationIdResolver.lift(em.event).map { correlationId =>
-      new Metadata(Map(CorrelationId -> correlationId))
+      new MetaData(Map(CorrelationId -> correlationId))
     }
 
 }

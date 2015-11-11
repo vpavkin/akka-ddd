@@ -7,9 +7,8 @@ import pl.newicom.dddd.messaging.correlation.EntityIdResolution
 
 import scala.reflect.ClassTag
 
-abstract class OfficeFactory[A : ClassTag] {
-
+trait OfficeFactory[A] {
   def getOrCreate: ActorRef
 
-  def officeName = implicitly[ClassTag[A]].runtimeClass.getSimpleName
+  def officeName: String
 }

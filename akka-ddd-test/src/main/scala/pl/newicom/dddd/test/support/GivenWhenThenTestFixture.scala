@@ -6,7 +6,7 @@ import akka.util.Timeout
 import org.scalacheck.Gen
 import pl.newicom.dddd.aggregate.Command
 import pl.newicom.dddd.delivery.protocol.Processed
-import pl.newicom.dddd.messaging.Metadata
+import pl.newicom.dddd.messaging.MetaData
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.utils.UUIDSupport._
 
@@ -154,5 +154,5 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
   def first[E](implicit wc: WhenContext[_], ct: ClassTag[E]): E =
     wc.pastEvents.first[E]
 
-  def commandMetaDataProvider(c: Command): Option[Metadata] = None
+  def commandMetaDataProvider(c: Command): Option[MetaData] = None
 }
