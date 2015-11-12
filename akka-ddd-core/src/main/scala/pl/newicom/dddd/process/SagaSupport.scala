@@ -24,7 +24,7 @@ object SagaSupport {
     sagaManager
   }
 
-  def registerSaga[A <: Saga : SagaConfig : EntityIdResolution : OfficeFactory : BusinessEntityActorFactory]
+  def registerSaga[A <: Saga : SagaConfig : EntityIdResolution : OfficeFactory : SagaActorFactory]
     (implicit cs: CreationSupport, smf: SagaManagerFactory): (ActorRef, ActorRef) = {
     
     val sagaOffice : ActorRef = Office.office[A]

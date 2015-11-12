@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
 trait ReliablePublisher[S, O, Cm <: Command, Ev <: DomainEvent, Er] extends PersistentActor with EventPublisher[Ev] with AtLeastOnceDelivery {
-  this: AggregateRootActor[S, O, Cm, Ev, Er] =>
+  this: AggregateRootActor[O, S, Cm, Ev, Er] =>
 
   implicit def system: ActorSystem = context.system
 

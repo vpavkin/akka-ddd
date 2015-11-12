@@ -14,14 +14,14 @@ import scalaz._
 
 
 object DummyOfficeWithGenSpec {
-  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
-    new AggregateRootActorFactory[DummyAggregateRoot] {
+  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyOffice] =
+    new AggregateRootActorFactory[DummyOffice] {
       override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 }
 
-class DummyOfficeWithGenSpec extends OfficeSpec[DummyAggregateRoot](Some(testSystem)) {
+class DummyOfficeWithGenSpec extends OfficeSpec[DummyOffice](Some(testSystem)) {
 
   def dummyOffice = officeUnderTest
 

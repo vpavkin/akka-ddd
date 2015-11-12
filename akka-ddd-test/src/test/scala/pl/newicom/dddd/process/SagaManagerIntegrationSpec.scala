@@ -23,18 +23,23 @@ object SagaManagerIntegrationSpec {
 
   case object GetNumberOfUnconfirmed
 
-  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
-    new AggregateRootActorFactory[DummyAggregateRoot] {
+  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyOffice] =
+    new AggregateRootActorFactory[DummyOffice] {
       override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 
+
+  implicit def actorSystem = integrationTestSystem("SagaManagerIntegrationSpec")
 }
 
 /**
  * Requires EventStore to be running on localhost!
  */
-class SagaManagerIntegrationSpec extends OfficeSpec[DummyAggregateRoot](Some(integrationTestSystem("SagaManagerIntegrationSpec"))) {
+
+
+
+class SagaManagerIntegrationSpec extends OfficeSpec[DummyOffice](Some(integrationTestSystem("SagaManagerIntegrationSpec"))) {
 
   override val shareAggregateRoot = true
 

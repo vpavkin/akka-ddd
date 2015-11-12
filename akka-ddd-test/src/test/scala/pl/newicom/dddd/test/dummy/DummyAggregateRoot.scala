@@ -4,8 +4,9 @@ import java.util.UUID
 
 import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate.{AggregateRootActor, AggregateRoot, Command, EntityId}
+import pl.newicom.dddd.cluster.DefaultShardResolution
 import pl.newicom.dddd.eventhandling.EventPublisher
-import pl.newicom.dddd.office.{Contract, OfficeInfo}
+import pl.newicom.dddd.office.{AggregateContract, OfficeInfo}
 import pl.newicom.dddd.utils.UUIDSupport
 
 object DummyAggregateRoot {
@@ -14,11 +15,12 @@ object DummyAggregateRoot {
   // Commands
   //
 
-  trait DummyOfficeContract extends Contract[DummyOffice] {
+  trait DummyOfficeContract extends AggregateContract[DummyOffice] {
     override type CommandImpl = DummyCommand
     override type ErrorImpl = String
     override type EventImpl = DummyEvent
   }
+
 
   trait DummyOffice
 
@@ -26,6 +28,7 @@ object DummyAggregateRoot {
     implicit val info = new OfficeInfo[DummyOffice] with DummyOfficeContract {
       override def name: String = "Dummy"
     }
+    implicit def defaultShardResolution = new DefaultShardResolution[DummyOffice]
   }
 
   sealed trait DummyCommand extends Command {
@@ -59,67 +62,65 @@ object DummyAggregateRoot {
     def bumpVersion: DummyState = copy(version = version + 1)
   }
 
-    object DummyState {
-      implicit val instance =  new AggregateRoot[DummyState, DummyOffice] with DummyOfficeContract with UUIDSupport {
-        override def processFirstCommand: ProcessFirstCommand = {
-          case CreateDummy(id, name, description, value) =>
-              if (value < 0) {
-                reject("negative value not allowed")
-              } else {
-                accept(DummyCreated(id, name, description, value))
-              }
-          case _ => reject("Unknown dummy")
+  implicit val instance = new AggregateRoot[DummyOffice] with DummyOfficeContract with UUIDSupport {
+    type State = DummyState
+    override def processFirstCommand: ProcessFirstCommand = {
+      case CreateDummy(id, name, description, value) =>
+        if (value < 0) {
+          reject("negative value not allowed")
+        } else {
+          accept(DummyCreated(id, name, description, value))
         }
+      case _ => reject("Unknown dummy")
+    }
 
-        override def applyFirstEvent: ApplyFirstEvent = {
-          case DummyCreated(_, _, _, value) => DummyState(value, None, 0)
+    override def applyFirstEvent: ApplyFirstEvent = {
+      case DummyCreated(_, _, _, value) => DummyState(value, None, 0)
+    }
+
+    override def processCommand(state: DummyState): ProcessCommand = {
+      case CreateDummy(id, name, description, value) => reject("Dummy already exists")
+
+      case ChangeName(id, name) => accept(NameChanged(id, name))
+
+      case ChangeDescription(id, description) => accept(DescriptionChanged(id, description))
+
+
+      case ChangeValue(id, value) => if (value < 0) {
+        reject("negative value not allowed")
+      } else {
+        accept(ValueChanged(id, value, state.version + 1))
+      }
+
+      case GenerateValue(id) =>
+        val value = (Math.random() * 100).toInt
+        accept(ValueGenerated(id, value, confirmationToken = uuidObj))
+
+      case ConfirmGeneratedValue(id, confirmationToken) =>
+        candidateValue(state)(confirmationToken).map { value =>
+          accept(ValueChanged(id, value, state.version + 1))
+        } getOrElse {
+          reject("Not found")
         }
+    }
 
-        override def processCommand(state: DummyState): ProcessCommand = {
-          case CreateDummy(id, name, description, value) => reject("Dummy already exists")
+    override def applyEvent(state: DummyState): ApplyEvent = { e: EventImpl => e match {
+      case ValueChanged(_, newValue, _) =>
+        state.copy(value = newValue, candidateValue = None)
+      case ValueGenerated(_, newValue, confirmationToken) =>
+        state.copy(candidateValue = Some(CandidateValue(newValue, confirmationToken)))
+      case _ => state
+    } } andThen(_.bumpVersion)
 
-          case ChangeName(id, name) => accept(NameChanged(id, name))
-
-          case ChangeDescription(id, description) => accept(DescriptionChanged(id, description))
-
-
-          case ChangeValue(id, value) => if (value < 0) {
-            reject("negative value not allowed")
-          } else {
-            accept(ValueChanged(id, value, state.version + 1))
-          }
-
-          case GenerateValue(id) =>
-            val value = (Math.random() * 100).toInt
-            accept(ValueGenerated(id, value, confirmationToken = uuidObj))
-
-          case ConfirmGeneratedValue(id, confirmationToken) =>
-            candidateValue(state)(confirmationToken).map { value =>
-              accept(ValueChanged(id, value, state.version + 1))
-            } getOrElse {
-              reject("Not found")
-            }
-        }
-
-        override def applyEvent(state: DummyState): ApplyEvent = { e: EventImpl => e match {
-          case ValueChanged(_, newValue, _) =>
-            state.copy(value = newValue, candidateValue = None)
-          case ValueGenerated(_, newValue, confirmationToken) =>
-            state.copy(candidateValue = Some(CandidateValue(newValue, confirmationToken)))
-          case _ => state
-        } } andThen(_.bumpVersion)
-
-        def candidateValue(state: DummyState)(confirmationToken: UUID): Option[Int] = {
-          state.candidateValue.flatMap { cv =>
-            if (cv.confirmationToken == confirmationToken) Some(cv.value) else None
-          }
-        }
+    def candidateValue(state: DummyState)(confirmationToken: UUID): Option[Int] = {
+      state.candidateValue.flatMap { cv =>
+        if (cv.confirmationToken == confirmationToken) Some(cv.value) else None
       }
     }
+  }
 }
 
 import DummyAggregateRoot._
 
-class DummyAggregateRoot extends AggregateRootActor[DummyState, DummyOffice, DummyCommand, DummyEvent, String] { this: EventPublisher[DummyEvent] =>
-  override val pc = PassivationConfig()
+class DummyAggregateRoot extends AggregateRootActor[DummyOffice, DummyState, DummyCommand, DummyEvent, String](PassivationConfig()) { this: EventPublisher[DummyEvent] =>
 }

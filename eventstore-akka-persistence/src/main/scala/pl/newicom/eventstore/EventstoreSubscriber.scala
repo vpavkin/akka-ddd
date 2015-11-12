@@ -10,7 +10,7 @@ import pl.newicom.dddd.aggregate.DomainEvent
 import pl.newicom.dddd.messaging.event.EventStreamSubscriber.{InFlightMessagesCallback, EventReceived}
 import pl.newicom.dddd.messaging.event.{EventStream, _}
 
-class DemandController(triggerActor: ActorRef, bufferSize: Int, initialDemand: Int = 1) extends InFlightMessagesCallback {
+class DemandController(triggerActor: ActorRef, bufferSize: Int, initialDemand: Int = 20) extends InFlightMessagesCallback {
 
   increaseDemand(initialDemand)
 
@@ -57,7 +57,7 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
 
    def flow: Flow[Trigger, EventReceived, Unit] = Flow() { implicit b =>
       import FlowGraph.Implicits._
-      val zip = b.add(ZipWith((msg: EventReceived, trigger: Trigger) => msg))
+      val zip = b.add(ZipWith(Keep.left[EventReceived, Trigger]))
 
       eventSource ~> zip.in0
       (zip.in1, zip.out)

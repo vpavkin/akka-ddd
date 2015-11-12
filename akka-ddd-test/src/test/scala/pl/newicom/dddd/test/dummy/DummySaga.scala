@@ -5,6 +5,7 @@ import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.messaging.correlation.EntityIdResolution
 import pl.newicom.dddd.messaging.event.EventMessage
+import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.process.{Saga, SagaActorFactory, SagaConfig}
 import pl.newicom.dddd.test.dummy.DummyAggregateRoot.{DummyCreated, ValueChanged}
 import pl.newicom.dddd.test.dummy.DummySaga.{EventApplied, DummyCommand}
@@ -27,6 +28,8 @@ object DummySaga {
     }
   }
 
+  implicit val config = new DummySagaConfig("DummySaga")
+
   case class DummyCommand(processId: EntityId, value: Int) extends Command {
     override def aggregateId: String = processId
   }
@@ -39,6 +42,8 @@ object DummySaga {
  * <code>DummyEvent</code> is received containing <code>value</code> equal to <code>counter + 1</code>
  * <code>DummySaga</code> publishes all applied events to local actor system bus.
  */
+
+
 class DummySaga(override val pc: PassivationConfig, dummyOffice: Option[ActorPath]) extends Saga {
 
   override def persistenceId: String = s"DummySaga-$id"

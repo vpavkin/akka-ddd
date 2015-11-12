@@ -19,14 +19,14 @@ import slick.dbio._
 import slick.dbio.DBIOAction.{failed, successful}
 import slick.dbio.Effect.All
 import slick.util.DumpInfo
-
+import DummyAggregateRoot._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 object SqlViewUpdateServiceIntegrationSpec {
 
-  implicit def dummyFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
-    new AggregateRootActorFactory[DummyAggregateRoot] {
+  implicit def dummyFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyOffice] =
+    new AggregateRootActorFactory[DummyOffice] {
       override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
@@ -45,7 +45,7 @@ object SqlViewUpdateServiceIntegrationSpec {
  * Requires Event Store (with projections enabled!) to be up and running.
  */
 class SqlViewUpdateServiceIntegrationSpec
-  extends OfficeSpec[DummyAggregateRoot](Some(integrationTestSystem("SqlViewUpdateServiceIntegrationSpec")))
+  extends OfficeSpec[DummyOffice](Some(integrationTestSystem("SqlViewUpdateServiceIntegrationSpec")))
   with SqlViewStoreTestSupport {
 
   "SqlViewUpdateService" should {

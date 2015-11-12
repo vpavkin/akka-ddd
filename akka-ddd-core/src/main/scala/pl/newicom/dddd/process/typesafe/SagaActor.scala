@@ -1,6 +1,7 @@
 package pl.newicom.dddd.process.typesafe
 
 import akka.actor.{ActorPath, ActorLogging}
+import akka.contrib.pattern.ReceivePipeline
 import akka.persistence.{RecoveryCompleted, AtLeastOnceDelivery, PersistentActor}
 import org.joda.time.DateTime
 import pl.newicom.dddd.actor.{PassivationConfig, GracefulPassivation}
@@ -24,7 +25,7 @@ object SagaActor {
 }
 
 class SagaActor[B, State, In <: Coproduct, C <: Coproduct](implicit handler: Apply[B, State, In], init: ApplyFirst[B, State, C], injectIn: InjectAny[In], injectC: InjectAny[C]) extends BusinessEntity with GracefulPassivation with PersistentActor
-with Deduplication with AtLeastOnceDelivery with ActorLogging {
+with ReceivePipeline with Deduplication with AtLeastOnceDelivery with ActorLogging {
 
   var stateOpt: Option[State] = None
 
@@ -44,9 +45,8 @@ with Deduplication with AtLeastOnceDelivery with ActorLogging {
 
   def eventMessage = _lastEventMessage.get
 
-  override def aroundReceive(receive: Receive, msg: Any): Unit = {
-    super.aroundReceive(receiveDuplicate(acknowledgeEvent).orElse(receive), msg)
-  }
+
+  override def handleDuplicated(m: Message): Unit = acknowledgeEvent(m)
 
   override def receiveCommand: Receive = receiveDeliveryReceipt orElse receiveEvent orElse receiveUnexpected
 

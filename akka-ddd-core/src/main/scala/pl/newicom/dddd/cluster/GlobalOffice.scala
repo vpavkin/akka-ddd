@@ -13,16 +13,14 @@ import scala.reflect.ClassTag
 
 trait GlobalOffice {
 
-  implicit def globalOfficeFactory[S, O]
+  implicit def globalOfficeFactory[O]
   (implicit
    system: ActorSystem,
-   tc: AggregateRoot[S, O],
-   sr: ShardResolution[S],
-   entityFactory: BusinessEntityActorFactory[S],
-   officeInfo: OfficeInfo[O],
-    s: ClassTag[S]
-  ): OfficeFactory[S] = {
-    new OfficeFactory[S] {
+   sr: ShardResolution[O],
+   entityFactory: BusinessEntityActorFactory[O],
+   officeInfo: OfficeInfo[O]
+  ): OfficeFactory[O] = {
+    new OfficeFactory[O] {
 
       def officeName: EntityId = officeInfo.name
 

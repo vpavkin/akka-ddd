@@ -12,14 +12,14 @@ import scalaz._
 import scala.concurrent.duration.{Duration, _}
 
 object DummyOfficeSpec {
-  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
-    new AggregateRootActorFactory[DummyAggregateRoot] {
+  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyOffice] =
+    new AggregateRootActorFactory[DummyOffice] {
       override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 }
 
-class DummyOfficeSpec extends OfficeSpec[DummyAggregateRoot](Some(testSystem)) {
+class DummyOfficeSpec extends OfficeSpec[DummyOffice](Some(testSystem)) {
 
   def dummyOffice = officeUnderTest
 

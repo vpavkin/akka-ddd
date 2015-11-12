@@ -1,7 +1,7 @@
 package pl.newicom.dddd.process.typesafe
 
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.office.{Contract, OfficeInfo}
+import pl.newicom.dddd.office.{AggregateContract, OfficeInfo}
 import shapeless._
 
 sealed trait SagaEventDecision
@@ -116,11 +116,11 @@ trait Reactions[State, In <: Coproduct, C <: Coproduct] {
   type Apply0[In0] = Apply[this.type, State, In0]
 
   trait SendTo[O] {
-    def apply[Cm <: Command, OCm <: Command, Ev <: DomainEvent, Er](command: Cm)(implicit officeInfo: Contract.Aux[O, OCm, Ev, Er], ev: Cm <:< OCm, eventHandler: Apply0[Ev], errorHandler: Apply0[Er], path: OfficePath[O]): Reaction[State]
+    def apply[Cm <: Command, OCm <: Command, Ev <: DomainEvent, Er](command: Cm)(implicit officeInfo: AggregateContract.Aux[O, OCm, Ev, Er], ev: Cm <:< OCm, eventHandler: Apply0[Ev], errorHandler: Apply0[Er], path: OfficePath[O]): Reaction[State]
   }
 
   def sendTo[O] = new SendTo[O] {
-    override def apply[Cm <: Command, OCm <: Command, Ev <: DomainEvent, Er](command: Cm)(implicit officeInfo: Contract.Aux[O, OCm, Ev, Er], ev: Cm <:< OCm, eventHandler: Apply0[Ev], errorHandler: Apply0[Er], path: OfficePath[O]): Reaction[State] = SendCommand(path, command)
+    override def apply[Cm <: Command, OCm <: Command, Ev <: DomainEvent, Er](command: Cm)(implicit officeInfo: AggregateContract.Aux[O, OCm, Ev, Er], ev: Cm <:< OCm, eventHandler: Apply0[Ev], errorHandler: Apply0[Er], path: OfficePath[O]): Reaction[State] = SendCommand(path, command)
   }
 
   def changeState(newState: State): Reaction[State] = ChangeState(newState)
