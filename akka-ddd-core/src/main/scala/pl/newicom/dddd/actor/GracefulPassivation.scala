@@ -17,9 +17,18 @@ trait GracefulPassivation extends Actor {
     context.setReceiveTimeout(pc.inactivityTimeout)
   }
 
+  def shouldPassivate: Boolean = true
+
+  private case object KeepGoing
+
   override def unhandled(message: Any) {
     message match {
-      case ReceiveTimeout => context.parent ! pc.passivationMsg
+      case ReceiveTimeout =>
+        if (shouldPassivate)
+          context.parent ! pc.passivationMsg
+        else
+          self ! KeepGoing
+      case KeepGoing =>
       case _ => super.unhandled(message)
     }
   }
