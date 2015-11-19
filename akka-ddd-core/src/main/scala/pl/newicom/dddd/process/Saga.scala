@@ -1,6 +1,6 @@
 package pl.newicom.dddd.process
 
-import akka.actor.{ActorLogging, ActorPath, Props}
+import akka.actor.{ReceiveTimeout, ActorLogging, ActorPath, Props}
 import akka.contrib.pattern.ReceivePipeline
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor, RecoveryCompleted}
 import org.joda.time.DateTime
@@ -13,6 +13,8 @@ import pl.newicom.dddd.messaging.event.EventMessage
 import pl.newicom.dddd.messaging.{Deduplication, Message}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.scheduling.ScheduleEvent
+import shapeless.Typeable
+import shapeless.syntax.typeable._
 
 abstract class SagaActorFactory[A <: Saga] extends BusinessEntityActorFactory[A] {
   import scala.concurrent.duration._
@@ -73,7 +75,7 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
 
   def receiveDeliveryReceipt: Receive = {
     case receipt: Delivered =>
-      persist(receipt)(updateState)
+      persist(receipt)(updateStateWithDeliveryReceipt)
   }
 
   def schedule(event: DomainEvent, deadline: DateTime, correlationId: EntityId = sagaId): Unit = {
@@ -90,12 +92,10 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
    */
   def receiveEvent: Receive
 
-  override def receiveRecover: Receive = {
-    case rc: RecoveryCompleted =>
-      // do nothing
-    case msg: Any =>
-      updateState(msg)
-
+  override def receiveRecover: Receive = { case msg =>
+    msg.cast[RecoveryCompleted].map(_ => ())
+        .orElse(msg.cast[EventMessage[DomainEvent]].map(updateStateWithEvent))
+          .orElse(msg.cast[Delivered].map(updateStateWithDeliveryReceipt)).getOrElse(())
   }
 
   /**
@@ -104,7 +104,7 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
   def raise(em: EventMessage[DomainEvent]): Unit =
     persist(em) { persisted =>
       log.debug("Event message persisted: {}", persisted)
-      updateState(persisted)
+      updateStateWithEvent(persisted)
       acknowledgeEvent(persisted)
     }
 
@@ -113,14 +113,15 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
    */
   def applyEvent: PartialFunction[DomainEvent, Unit]
 
-  private def updateState(msg: Any): Unit = msg match {
-    case em: EventMessage[_] =>
-      messageProcessed(em)
-      applyEvent.applyOrElse(em.event, (e: DomainEvent) => ())
-    case receipt: Delivered =>
-      confirmDelivery(receipt.deliveryId)
-      log.debug(s"Delivery of message confirmed (receipt: $receipt)")
-      applyEvent.applyOrElse(receipt, (e: DomainEvent) => ())
+  private def updateStateWithEvent(em: EventMessage[DomainEvent]) = {
+    messageProcessed(em)
+    applyEvent.applyOrElse(em.event, (e: DomainEvent) => ())
+  }
+
+  private def updateStateWithDeliveryReceipt(receipt: Delivered) = {
+    confirmDelivery(receipt.deliveryId)
+    log.debug(s"Delivery of message confirmed (receipt: $receipt)")
+    applyEvent.applyOrElse(receipt, (e: DomainEvent) => ())
   }
 
   private def acknowledgeEvent(em: Message) {
@@ -139,10 +140,12 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
 
   override def messageProcessed(m: Message): Unit = {
     _lastEventMessage = m match {
-      case em: EventMessage[DomainEvent] =>
+      case em @ EventMessage(_, _) =>
         Some(em)
       case _ => None
     }
     super.messageProcessed(m)
   }
+
+  override def shouldPassivate: Boolean = numberOfUnconfirmed == 0
 }

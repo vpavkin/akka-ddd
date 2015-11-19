@@ -108,12 +108,12 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er](va
     case Accept(evt) => raise(commandMessage)(evt)
     case Reject(err) => acknowledgeCommand(commandMessage)(err.left[Ev])
     case Collaborate(f) =>
-      context.become(awaitinCollaborationResult(commandMessage), discardOld = false)
+      context.become(awaitingCollaborationResult(commandMessage), discardOld = false)
       f(ec).map(CollaborationResult).pipeTo(self)
     case Ignore =>
   }
 
-  def awaitinCollaborationResult(commandMessage: CommandMessage): Receive = {
+  def awaitingCollaborationResult(commandMessage: CommandMessage): Receive = {
     case CollaborationResult(reaction) =>
       unstashAll()
       context.unbecome()
@@ -148,7 +148,7 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er](va
   def acknowledgeCommand(commandMessage: CommandMessage)(result: Er \/ Ev) =
     acknowledgeCommandProcessed(Success(result))(commandMessage)
 
-  def acknowledgeCommandProcessed(result: Try[Any] = Success("Ok"))(msg: Message) {
+  def acknowledgeCommandProcessed(result: Any = "Ok")(msg: Message) {
     val deliveryReceipt = msg.deliveryReceipt(result)
     sender() ! deliveryReceipt
     log.debug(s"Delivery receipt (for received command) sent ($deliveryReceipt)")

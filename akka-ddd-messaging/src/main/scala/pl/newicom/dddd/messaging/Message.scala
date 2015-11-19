@@ -1,10 +1,8 @@
 package pl.newicom.dddd.messaging
 
 import pl.newicom.dddd.aggregate.EntityId
-import pl.newicom.dddd.delivery.protocol.{Receipt, Processed, alod}
+import pl.newicom.dddd.delivery.protocol.{Processed, Receipt, alod}
 import pl.newicom.dddd.messaging.MetaData._
-
-import scala.util.{Success, Try}
 
 object MetaData {
   val DeliveryId          = "_deliveryId"
@@ -72,7 +70,7 @@ trait Message extends Serializable {
 
   def tryGetMetaAttribute[B](attrName: String): Option[B] = if (metadata.isDefined) metadata.get.tryGet[B](attrName.toString) else None
 
-  def deliveryReceipt(result: Try[Any] = Success("OK")): Receipt = {
+  def deliveryReceipt(result: Any = "OK"): Receipt = {
     deliveryId.map(id => alod.Processed(id, result)).getOrElse(Processed(result))
   }
 

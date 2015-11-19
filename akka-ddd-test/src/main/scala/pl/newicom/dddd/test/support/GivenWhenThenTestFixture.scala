@@ -51,7 +51,7 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
 
   case class PastEvents(list: List[Processed] = List.empty) {
     private val map: Map[Class[_], List[Any]] =
-      list.groupBy(_.result.get.getClass).mapValues(ackSeq => ackSeq.map(_.result.get))
+      list.groupBy(_.result.getClass).mapValues(ackSeq => ackSeq.map(_.result))
 
     def first[E](implicit ct: ClassTag[E]): E = map.get(ct.runtimeClass).map(_.head).orNull.asInstanceOf[E]
     def last[E](implicit ct: ClassTag[E]): E = map.get(ct.runtimeClass).map(_.last).orNull.asInstanceOf[E]

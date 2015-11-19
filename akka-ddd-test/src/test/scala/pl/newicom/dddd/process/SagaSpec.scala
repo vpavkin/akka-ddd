@@ -25,7 +25,7 @@ class SagaSpec extends TestKit(TestConfig.testSystem) with WordSpecLike with Imp
     override def props(pc: PassivationConfig): Props = {
       Props(new DummySaga(pc, None) {
         override def receiveUnexpected: Receive = {
-          case em: EventMessage[_] =>
+          case em @ EventMessage(_, _) =>
             system.eventStream.publish(em.event)
         }
       })

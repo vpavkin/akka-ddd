@@ -17,6 +17,8 @@ import pl.newicom.dddd.scheduling.EventScheduled
 import pl.newicom.dddd.serialization.{JsonSerHints, JsonExtraSerHints}
 import pl.newicom.dddd.serialization.JsonSerHints._
 
+import scala.reflect.ClassTag
+
 /**
  * The reason for using Extension mechanism is that
  * pl.newicom.eventstore.json.JsonSerializerExtensionImpl.ActorRefSerializer
@@ -37,9 +39,9 @@ class JsonSerializerExtensionImpl(system: ExtendedActorSystem) extends Extension
 
   val UTF8 = Charset.forName("UTF-8")
 
-  def fromBinary[A](bytes: Array[Byte], clazz: Class[A], hints: JsonSerHints): A = {
+  def fromBinary[A](bytes: Array[Byte], hints: JsonSerHints)(implicit ct: ClassTag[A]): A = {
     implicit val formats: Formats = hints ++ extraHints
-    implicit val manifest: Manifest[A] = Manifest.classType(clazz)
+    implicit val manifest: Manifest[A] = Manifest.classType(ct.runtimeClass)
     try {
       read(new String(bytes, UTF8))
     } catch {

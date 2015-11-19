@@ -12,7 +12,8 @@ import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.{Message, Deduplication}
 import pl.newicom.dddd.messaging.event.EventMessage
 import pl.newicom.dddd.scheduling.ScheduleEvent
-import shapeless.Coproduct
+import shapeless.ops.coproduct.{Selector, Inject}
+import shapeless.{:+:, CNil, Coproduct}
 
 object SagaActor {
   trait Create[Saga] {

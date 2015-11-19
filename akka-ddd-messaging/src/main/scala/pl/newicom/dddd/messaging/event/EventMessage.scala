@@ -5,6 +5,8 @@ import pl.newicom.dddd.aggregate.DomainEvent
 import pl.newicom.dddd.messaging.MetaData.CorrelationId
 import pl.newicom.dddd.messaging.{MetaData, EntityMessage, Message}
 import pl.newicom.dddd.utils.UUIDSupport._
+import shapeless.syntax.typeable._
+import shapeless.Typeable
 
 object EventMessage {
   def unapply[E <: DomainEvent](em: EventMessage[E]): Option[(String, E)] = {
@@ -25,6 +27,18 @@ object EventMessage {
 
     def copyWithMetadata(newMetaData: Option[MetaData]): MessageImpl = EventMessage(event, id, timestamp, newMetaData)
   }
+
+  implicit def typeable[T <: DomainEvent](implicit castT: Typeable[T]): Typeable[EventMessage[T]] =
+    new Typeable[EventMessage[T]]{
+      def cast(t: Any): Option[EventMessage[T]] = {
+        if(t == null) None
+        else if(t.isInstanceOf[EventMessage[_ <: DomainEvent]]) {
+          val o = t.asInstanceOf[EventMessage[_ <: DomainEvent]]
+          o.event.cast[T].map(_ => t.asInstanceOf[EventMessage[T]])
+        } else None
+      }
+      def describe = s"Option[${castT.describe}]"
+    }
 }
 
 trait EventMessage[+E <: DomainEvent] extends Message with EntityMessage {

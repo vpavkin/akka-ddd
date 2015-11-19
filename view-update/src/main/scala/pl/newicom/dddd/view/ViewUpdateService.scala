@@ -113,7 +113,7 @@ abstract class ViewUpdateService extends Actor with EventstoreSerializationSuppo
           }.filter {
             !_.alreadyProcessed
           }.mapAsync(1) {
-            event => handler.handle(toDomainEventMessage(event.eventData).get, event.eventNr)
+            event => handler.handle(toDomainEventMessage(event.eventData), event.eventNr)
           }.toMat(Sink.ignore)(Keep.right)
       )
     }
