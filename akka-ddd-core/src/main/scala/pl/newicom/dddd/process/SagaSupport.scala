@@ -12,9 +12,9 @@ object SagaSupport {
    */
   type SagaManagerFactory = (SagaConfig[_], ActorPath) => SagaManager
 
-  implicit def defaultCaseIdResolution[A <: Saga](): EntityIdResolution[A] = new EntityIdResolution[A]
+  implicit def defaultCaseIdResolution[A <: Saga[_]](): EntityIdResolution[A] = new EntityIdResolution[A]
 
-  def registerSaga[A <: Saga : SagaConfig](sagaOffice: ActorRef)(implicit cs: CreationSupport, smf: SagaManagerFactory): ActorRef = {
+  def registerSaga[A <: Saga[_] : SagaConfig](sagaOffice: ActorRef)(implicit cs: CreationSupport, smf: SagaManagerFactory): ActorRef = {
     val sagaOfficePath = sagaOffice.path
     val sagaConfig: SagaConfig[A] = implicitly[SagaConfig[A]]
 
@@ -24,7 +24,7 @@ object SagaSupport {
     sagaManager
   }
 
-  def registerSaga[A <: Saga : SagaConfig : EntityIdResolution : OfficeFactory : SagaActorFactory]
+  def registerSaga[A <: Saga[_] : SagaConfig : EntityIdResolution : OfficeFactory : SagaActorFactory]
     (implicit cs: CreationSupport, smf: SagaManagerFactory): (ActorRef, ActorRef) = {
     
     val sagaOffice : ActorRef = Office.office[A]

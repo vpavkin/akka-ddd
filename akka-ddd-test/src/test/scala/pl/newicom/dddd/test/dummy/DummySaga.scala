@@ -9,6 +9,8 @@ import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.process.{Saga, SagaActorFactory, SagaConfig}
 import pl.newicom.dddd.test.dummy.DummyAggregateRoot.{DummyCreated, ValueChanged}
 import pl.newicom.dddd.test.dummy.DummySaga.{EventApplied, DummyCommand}
+import shapeless.ops.coproduct.Mapper.Aux
+import shapeless.{Poly1, :+:, CNil}
 
 object DummySaga {
 
@@ -44,7 +46,7 @@ object DummySaga {
  */
 
 
-class DummySaga(override val pc: PassivationConfig, dummyOffice: Option[ActorPath]) extends Saga {
+class DummySaga(override val pc: PassivationConfig, dummyOffice: Option[ActorPath]) extends Saga[ValueChanged :+: CNil] {
 
   override def persistenceId: String = s"DummySaga-$id"
 
@@ -60,7 +62,13 @@ class DummySaga(override val pc: PassivationConfig, dummyOffice: Option[ActorPat
       }
   }
 
-  // see alternative implementation below
+
+  object receiveEvent extends Poly1 {
+
+  }
+
+  override implicit def mapper: Aux[receiveEvent.type, :+:[ValueChanged, CNil], :+:[Unit, CNil]] = ???
+
   def receiveEvent: Receive = {
     case em @ EventMessage(_, ValueChanged(_, value: Int, _)) if counter + 1 == value =>
       raise(em)

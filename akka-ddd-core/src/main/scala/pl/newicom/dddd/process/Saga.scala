@@ -12,11 +12,15 @@ import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.event.EventMessage
 import pl.newicom.dddd.messaging.{Deduplication, Message}
 import pl.newicom.dddd.office.OfficeInfo
+import pl.newicom.dddd.process.typesafe.InjectAny
 import pl.newicom.dddd.scheduling.ScheduleEvent
-import shapeless.Typeable
+import shapeless.ops.coproduct.{Unifier, Mapper}
+import shapeless._
 import shapeless.syntax.typeable._
 
-abstract class SagaActorFactory[A <: Saga] extends BusinessEntityActorFactory[A] {
+import scala.reflect.ClassTag
+
+abstract class SagaActorFactory[A <: Saga[_]] extends BusinessEntityActorFactory[A] {
   import scala.concurrent.duration._
 
   def props(pc: PassivationConfig): Props
@@ -26,7 +30,7 @@ abstract class SagaActorFactory[A <: Saga] extends BusinessEntityActorFactory[A]
 /**
  * @param bpsName name of Business Process Stream (bps)
  */
-abstract class SagaConfig[A <: Saga](val bpsName: String) extends OfficeInfo[A] {
+abstract class SagaConfig[A <: Saga[_]](val bpsName: String) extends OfficeInfo[A] {
 
   def name = bpsName
 
@@ -39,7 +43,7 @@ abstract class SagaConfig[A <: Saga](val bpsName: String) extends OfficeInfo[A] 
   override def isSagaOffice: Boolean = true
 }
 
-trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
+abstract class Saga[Cm <: Coproduct : ClassTag : InjectAny] extends BusinessEntity with GracefulPassivation with PersistentActor
   with ReceivePipeline with Deduplication with AtLeastOnceDelivery with ActorLogging {
 
   def sagaId = self.path.name
@@ -61,7 +65,7 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
 
   def handleDuplicated(m: Message) = acknowledgeEvent(m)
 
-  override def receiveCommand: Receive = receiveDeliveryReceipt orElse receiveEvent orElse receiveUnexpected
+  override def receiveCommand: Receive = receiveDeliveryReceipt orElse receiveEventMessage orElse receiveUnexpected
 
   def deliverMsg(office: ActorPath, msg: Message): Unit = {
     deliver(office)(deliveryId => {
@@ -90,7 +94,36 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
    * State transition happens when raise(event) is called.
    * No state transition indicates the current event message could have been received out-of-order.
    */
-  def receiveEvent: Receive
+
+
+  trait PolyReceive extends Poly { outer =>
+    type Case[A] = poly.Case[this.type, A::HNil]
+
+    class CaseBuilder[A] {
+      def apply(fn: (A) => Unit): Case[A] { type Result = Unit } = new Case[A] {
+        type Result = Unit
+        val value = (l: A :: HNil) => l match {
+          case a :: HNil => fn(a)
+        }
+      }
+    }
+
+    def at[A] = new CaseBuilder[A]
+  }
+
+  val receiveEvent: PolyReceive
+
+  implicit def mapper: Mapper[receiveEvent.type, Cm]
+
+  var currentEm: Option[EventMessage[DomainEvent]] = None
+
+  val unapply = InjectAny[Cm]
+
+  def receiveEventMessage: Receive = {
+    case em @ EventMessage(_, unapply(msg)) =>
+      currentEm = Some(em)
+      msg.map(receiveEvent)
+  }
 
   override def receiveRecover: Receive = { case msg =>
     msg.cast[RecoveryCompleted].map(_ => ())
@@ -101,12 +134,13 @@ trait Saga extends BusinessEntity with GracefulPassivation with PersistentActor
   /**
    * Triggers state transition
    */
-  def raise(em: EventMessage[DomainEvent]): Unit =
+  def raise(): Unit = currentEm.foreach { em =>
     persist(em) { persisted =>
       log.debug("Event message persisted: {}", persisted)
       updateStateWithEvent(persisted)
       acknowledgeEvent(persisted)
     }
+  }
 
   /**
    * Event handler called on state transition
