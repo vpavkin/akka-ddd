@@ -28,9 +28,15 @@ class SchedulerSpec extends OfficeSpec[SchedulingOffice](Some(testSystem)) {
       when {
         ScheduleEvent(businessUnit, null, DateTime.now().plusMinutes(1), null)
       }
-      .expect { c =>
-        EventScheduled(c.businessUnit, c.target, c.deadline.withSecondOfMinute(0).withMillisOfSecond(0), c.deadline.getMillis, c.event)
-      }
+        .expect { c =>
+          EventScheduled(
+            ScheduledEventMetadata(
+              c.businessUnit,
+              c.target,
+              c.deadline.withSecondOfMinute(0).withMillisOfSecond(0),
+              c.deadline.getMillis),
+            c.event)
+        }
     }
   }
 
