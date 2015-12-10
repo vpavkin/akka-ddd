@@ -7,12 +7,12 @@ import pl.newicom.dddd.aggregate.{Command, DomainEvent}
   //
   // Commands
   //
-  case class ScheduleEvent(businessUnit: String, target: ActorPath, deadline: DateTime, event: DomainEvent) extends Command {
+  case class ScheduleCommand(businessUnit: String, target: ActorPath, deadline: DateTime, command: Command) extends Command {
     def aggregateId = businessUnit
   }
 
   // 
   // Events
   // 
-  case class EventScheduled(metadata: ScheduledEventMetadata, event: DomainEvent)
- case class ScheduledEventMetadata(businessUnit: String, target: ActorPath, deadline: DateTime, deadlineMillis: Long)
+  case class CommandScheduled(metadata: ScheduledCommandMetadata, event: DomainEvent)
+ case class ScheduledCommandMetadata(businessUnit: String, target: ActorPath, deadline: DateTime, deadlineMillis: Long)

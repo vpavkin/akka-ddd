@@ -13,7 +13,7 @@ import org.json4s.{Formats, FullTypeHints, _}
 import pl.newicom.dddd.delivery.protocol.Processed
 import pl.newicom.dddd.delivery.protocol.alod.{Processed => AlodProcessed}
 import pl.newicom.dddd.messaging.MetaData
-import pl.newicom.dddd.scheduling.{ScheduledEventMetadata, EventScheduled}
+import pl.newicom.dddd.scheduling.{ScheduledCommandMetadata, CommandScheduled}
 import pl.newicom.dddd.serialization.{JsonSerHints, JsonExtraSerHints}
 import pl.newicom.dddd.serialization.JsonSerHints._
 
@@ -31,7 +31,7 @@ class JsonSerializerExtensionImpl(system: ExtendedActorSystem) extends Extension
   val extraHints = JsonExtraSerHints(
     typeHints =
       new FullTypeHints(
-        List(classOf[MetaData], classOf[Processed], classOf[AlodProcessed], classOf[PersistentRepr], classOf[EventScheduled])
+        List(classOf[MetaData], classOf[Processed], classOf[AlodProcessed], classOf[PersistentRepr], classOf[CommandScheduled])
       ),
     serializers =
       List(ActorRefSerializer, ActorPathSerializer, new ScheduledEventSerializer, new SnapshotJsonSerializer(system))
@@ -80,8 +80,8 @@ object ActorPathSerializer extends CustomSerializer[ActorPath](format => (
   { case x: ActorPath => JString(x.toSerializationFormat) }
   ))
 
-class ScheduledEventSerializer extends Serializer[EventScheduled] {
-  val Clazz = classOf[EventScheduled]
+class ScheduledEventSerializer extends Serializer[CommandScheduled] {
+  val Clazz = classOf[CommandScheduled]
 
   def deserialize(implicit formats: Formats) = {
     case (TypeInfo(Clazz, _), JObject(List(
@@ -90,14 +90,14 @@ class ScheduledEventSerializer extends Serializer[EventScheduled] {
     JField("event", event)))) =>
       val eventClass = Class.forName(eventClassName)
       val eventObj = event.extract[AnyRef](formats, Manifest.classType(eventClass))
-      val metadataObj = metadata.extract[ScheduledEventMetadata]
-      EventScheduled(metadataObj, eventObj)
+      val metadataObj = metadata.extract[ScheduledCommandMetadata]
+      CommandScheduled(metadataObj, eventObj)
   }
 
   def serialize(implicit formats: Formats) = {
-    case EventScheduled(metadata, event) =>
+    case CommandScheduled(metadata, event) =>
       JObject(
-        "jsonClass"   -> JString(classOf[EventScheduled].getName),
+        "jsonClass"   -> JString(classOf[CommandScheduled].getName),
         "metadata"    -> decompose(metadata),
         "eventClass"  -> JString(event.getClass.getName),
         "event"       -> decompose(event)

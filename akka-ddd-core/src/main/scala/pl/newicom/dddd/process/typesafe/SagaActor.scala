@@ -11,7 +11,7 @@ import pl.newicom.dddd.messaging.MetaData._
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.{Message, Deduplication}
 import pl.newicom.dddd.messaging.event.EventMessage
-import pl.newicom.dddd.scheduling.ScheduleEvent
+import pl.newicom.dddd.scheduling.ScheduleCommand
 import shapeless.ops.coproduct.{Selector, Inject}
 import shapeless.{:+:, CNil, Coproduct}
 
@@ -66,10 +66,9 @@ with ReceivePipeline with Deduplication with AtLeastOnceDelivery with ActorLoggi
       persist(receipt)(updateState)
   }
 
-  def schedule(event: DomainEvent, deadline: DateTime, correlationId: EntityId = sagaId): Unit = {
+  def schedule(command: Command, deadline: DateTime, correlationId: EntityId = sagaId): Unit = {
     schedulingOffice.fold(throw new UnsupportedOperationException("Scheduling Office is not defined.")) { schOffice =>
-      val command = ScheduleEvent("global", sagaOffice, deadline, event)
-      deliverMsg(schOffice, CommandMessage(command).withCorrelationId(correlationId))
+      deliverCommand(schOffice, ScheduleCommand("global", sagaOffice, deadline, command))
     }
   }
 

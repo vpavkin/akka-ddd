@@ -5,6 +5,7 @@ import akka.contrib.pattern.ReceivePipeline
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor, RecoveryCompleted}
 import org.joda.time.DateTime
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, GracefulPassivation, PassivationConfig}
+import pl.newicom.dddd.aggregate
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.alod._
 import pl.newicom.dddd.messaging.MetaData.DeliveryId
@@ -13,7 +14,7 @@ import pl.newicom.dddd.messaging.event.EventMessage
 import pl.newicom.dddd.messaging.{Deduplication, Message}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.process.typesafe.InjectAny
-import pl.newicom.dddd.scheduling.ScheduleEvent
+import pl.newicom.dddd.scheduling.ScheduleCommand
 import shapeless.ops.coproduct.{Unifier, Mapper}
 import shapeless._
 import shapeless.syntax.typeable._
@@ -30,21 +31,35 @@ abstract class SagaActorFactory[A <: Saga[_]] extends BusinessEntityActorFactory
 /**
  * @param bpsName name of Business Process Stream (bps)
  */
-abstract class SagaConfig[A <: Saga[_]](val bpsName: String) extends OfficeInfo[A] {
+abstract class SagaConfig[S <: Saga[_]](val bpsName: String) extends OfficeInfo[S] {
 
   def name = bpsName
 
   /**
-   * Correlation ID identifies process instance. It is used to route EventMessage
-   * messages created by [[SagaManager]] to [[Saga]] instance,
-   */
+    * Correlation ID identifies process instance. It is used to route EventMessage
+    * messages created by [[SagaManager]] to [[Saga]] instance,
+    */
   def correlationIdResolver: PartialFunction[DomainEvent, EntityId]
 
   override def isSagaOffice: Boolean = true
 }
 
-abstract class Saga[Cm <: Coproduct : ClassTag : InjectAny] extends BusinessEntity with GracefulPassivation with PersistentActor
+abstract class Saga[In <: Coproduct : ClassTag : InjectAny] extends BusinessEntity with GracefulPassivation with PersistentActor
   with ReceivePipeline with Deduplication with AtLeastOnceDelivery with ActorLogging {
+
+  implicit class Deliver(actorPath: ActorPath) {
+    def !!(command: aggregate.Command): Unit =
+      deliverMsg(actorPath, CommandMessage(command).causedBy(eventMessage))
+
+    trait ScheduleBuilder {
+      def at(deadline: DateTime): Unit
+    }
+    def schedule(command: aggregate.Command) = new ScheduleBuilder {
+      override def at(deadline: DateTime): Unit = schedulingOffice.fold(throw new UnsupportedOperationException("Scheduling Office is not defined.")) {
+        _ !! ScheduleCommand("global", actorPath, deadline, command)
+      }
+    }
+  }
 
   def sagaId = self.path.name
 
@@ -73,20 +88,9 @@ abstract class Saga[Cm <: Coproduct : ClassTag : InjectAny] extends BusinessEnti
     })
   }
 
-  def deliverCommand(office: ActorPath, command: Command): Unit = {
-    deliverMsg(office, CommandMessage(command).causedBy(eventMessage))
-  }
-
   def receiveDeliveryReceipt: Receive = {
     case receipt: Delivered =>
       persist(receipt)(updateStateWithDeliveryReceipt)
-  }
-
-  def schedule(event: DomainEvent, deadline: DateTime, correlationId: EntityId = sagaId): Unit = {
-    schedulingOffice.fold(throw new UnsupportedOperationException("Scheduling Office is not defined.")) { schOffice =>
-      val command = ScheduleEvent("global", sagaOffice, deadline, event)
-      deliverMsg(schOffice, CommandMessage(command).withCorrelationId(correlationId))
-    }
   }
 
   /**
@@ -94,7 +98,6 @@ abstract class Saga[Cm <: Coproduct : ClassTag : InjectAny] extends BusinessEnti
    * State transition happens when raise(event) is called.
    * No state transition indicates the current event message could have been received out-of-order.
    */
-
 
   trait PolyReceive extends Poly { outer =>
     type Case[A] = poly.Case[this.type, A::HNil]
@@ -113,14 +116,14 @@ abstract class Saga[Cm <: Coproduct : ClassTag : InjectAny] extends BusinessEnti
 
   val receiveEvent: PolyReceive
 
-  implicit def mapper: Mapper[receiveEvent.type, Cm]
+  implicit def mapper: Mapper[receiveEvent.type, In]
 
   var currentEm: Option[EventMessage[DomainEvent]] = None
 
-  val unapply = InjectAny[Cm]
+  val In = InjectAny[In]
 
   def receiveEventMessage: Receive = {
-    case em @ EventMessage(_, unapply(msg)) =>
+    case em @ EventMessage(_, In(msg)) =>
       currentEm = Some(em)
       msg.map(receiveEvent)
   }

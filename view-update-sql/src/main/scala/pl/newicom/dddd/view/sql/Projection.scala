@@ -10,8 +10,8 @@ object Projection {
   type ProjectionAction[E <: Effect] = DBIOAction[Unit, NoStream, E]
 }
 
-trait Projection extends DBActionHelpers {
+trait Projection[-E <: DomainEvent] extends DBActionHelpers {
 
-  def consume(event: DomainEventMessage[DomainEvent]): ProjectionAction[All]
+  def consume(event: DomainEventMessage[E]): ProjectionAction[All]
 
 }

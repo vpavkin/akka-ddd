@@ -10,7 +10,7 @@ object DomainEventMessage {
   def apply[E <: DomainEvent](em: EventMessage[E], snapshotId: AggregateSnapshotId): DomainEventMessage[E] = DomainEventMessage(snapshotId, em.event, em.id, em.timestamp, None)
 }
 
-case class DomainEventMessage[E <: DomainEvent](
+case class DomainEventMessage[+E <: DomainEvent](
     snapshotId: AggregateSnapshotId,
     event: E,
     id: String = uuid,
@@ -18,13 +18,13 @@ case class DomainEventMessage[E <: DomainEvent](
     metadata: Option[MetaData] = None)
   extends EventMessage[E] {
 
-  override type MessageImpl = DomainEventMessage[E]
+  override type MessageImpl <: DomainEventMessage[E]
 
   override def entityId = aggregateId
 
 
 
-  override def copyWithMetadata(m: Option[MetaData]): DomainEventMessage[E] = copy(metadata = m)
+  override def copyWithMetadata(m: Option[MetaData]): MessageImpl = copy(metadata = m).asInstanceOf[MessageImpl]
 
   def aggregateId = snapshotId.aggregateId
 

@@ -2,7 +2,7 @@ package pl.newicom.eventstore
 
 import akka.actor._
 import akka.stream.scaladsl._
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.{FlowShape, ActorMaterializer, OverflowStrategy}
 import eventstore.EventNumber._
 import eventstore._
 import eventstore.pipeline.TickGenerator.{Tick, Trigger}
@@ -55,13 +55,13 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
       }
     }
 
-   def flow: Flow[Trigger, EventReceived, Unit] = Flow() { implicit b =>
+   def flow: Flow[Trigger, EventReceived, Unit] = Flow.fromGraph(FlowGraph.create() { implicit b =>
       import FlowGraph.Implicits._
       val zip = b.add(ZipWith(Keep.left[EventReceived, Trigger]))
 
       eventSource ~> zip.in0
-      (zip.in1, zip.out)
-    }
+      FlowShape(zip.in1, zip.out)
+    })
 
     val sink = Sink.actorRef(self, onCompleteMessage = Kill)
     val triggerSource = Source.actorRef(bufferSize, OverflowStrategy.dropNew)

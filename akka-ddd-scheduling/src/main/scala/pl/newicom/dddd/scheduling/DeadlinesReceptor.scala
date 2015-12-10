@@ -8,8 +8,8 @@ object DeadlinesReceptor {
   def apply(businessUnit: String): ReceptorConfig = ReceptorBuilder()
     .reactToStream(currentDeadlinesStream(businessUnit))
     .applyTransduction {
-      case em @ EventMessage(_, EventScheduled(metadata, event)) =>
-        new EventMessage(event)
+      case em @ EventMessage(_, CommandScheduled(metadata, event)) =>
+        EventMessage(event)
           .withCorrelationId(em.correlationId.get)
           .withMetaAttribute("target", metadata.target.toSerializationFormat)
     }

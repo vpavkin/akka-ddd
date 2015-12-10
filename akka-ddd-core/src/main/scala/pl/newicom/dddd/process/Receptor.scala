@@ -93,8 +93,6 @@ abstract class Receptor extends AtLeastOnceDeliverySupport with ReceptorPersiste
         log.warning(s"RECEIVED: $other")
     }
 
-
-
   def metaDataProvider(em: EventMessage[DomainEvent]): Option[MetaData] = None
 
   def receiveEvent: Receive = {

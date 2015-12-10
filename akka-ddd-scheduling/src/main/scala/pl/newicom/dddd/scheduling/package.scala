@@ -11,33 +11,34 @@ package object scheduling {
   }
 
   implicit val schedulingOfficeContract: AggregateContract[SchedulingOffice] = new AggregateContract[SchedulingOffice] {
-    override type CommandImpl = ScheduleEvent
+    override type CommandImpl = ScheduleCommand
     override type ErrorImpl = Nothing
-    override type EventImpl = EventScheduled
+    override type EventImpl = CommandScheduled
   }
 
   def currentDeadlinesStream(businessUnit: String) = ClerkEventStream("currentDeadlines", businessUnit)
 
   implicit val state = new AggregateRoot[SchedulingOffice] {
     type State = Unit
-    override type EventImpl = EventScheduled
-    override type CommandImpl = ScheduleEvent
+    override type EventImpl = CommandScheduled
+    override type CommandImpl = ScheduleCommand
     override type ErrorImpl = Nothing
 
     override def processFirstCommand: ProcessFirstCommand = {
-      case e: ScheduleEvent => processCommand(())(e)
+      case e: ScheduleCommand => processCommand(())(e)
     }
     override def applyFirstEvent: ApplyFirstEvent = {case _ => ()}
 
     override def processCommand(state: Unit): ProcessCommand = {
-      case ScheduleEvent(bu, target, deadline, msg) =>
+      case ScheduleCommand(bu, target, deadline, msg) =>
+        val metadata = ScheduledCommandMetadata(
+          bu,
+          target,
+          deadline.withSecondOfMinute(0).withMillisOfSecond(0),
+          deadline.getMillis
+        )
         accept(
-          EventScheduled(
-            bu,
-            target,
-            deadline.withSecondOfMinute(0).withMillisOfSecond(0),
-            deadline.getMillis,
-            msg)
+          CommandScheduled(metadata, msg)
         )
     }
     override def applyEvent(state: Unit): ApplyEvent = Function.const(state)

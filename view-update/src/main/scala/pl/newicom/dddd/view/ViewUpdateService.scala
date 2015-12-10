@@ -7,6 +7,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Keep, Source, Sink, RunnableGraph}
 import eventstore.EventNumber.Exact
 import eventstore._
+import pl.newicom.dddd.aggregate.DomainEvent
 import pl.newicom.dddd.messaging.event.OfficeEventStream
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.view.ViewUpdateInitializer.ViewUpdateInitException
@@ -37,7 +38,7 @@ object ViewUpdateService {
 
 }
 
-abstract class ViewUpdateService extends Actor with EventstoreSerializationSupport with ActorLogging {
+abstract class ViewUpdateService[-E <: DomainEvent] extends Actor with EventstoreSerializationSupport with ActorLogging {
 
   type VUConfig <: ViewUpdateConfig
 
@@ -49,7 +50,7 @@ abstract class ViewUpdateService extends Actor with EventstoreSerializationSuppo
 
   def vuConfigs: Seq[VUConfig]
 
-  def viewHandler(config: VUConfig): ViewHandler
+  def viewHandler(config: VUConfig): ViewHandler[E]
 
   def ensureViewStoreAvailable: Future[Unit]
 

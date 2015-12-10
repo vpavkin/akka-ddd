@@ -6,8 +6,8 @@ import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.eventhandling.EventPublisher
 
 
-class SchedulerActor(pc: PassivationConfig) extends AggregateRootActor[SchedulingOffice, Unit, ScheduleEvent, EventScheduled, Nothing](pc) {
-  this: EventPublisher[EventScheduled] =>
+class SchedulerActor(pc: PassivationConfig) extends AggregateRootActor[SchedulingOffice, Unit, ScheduleCommand, CommandScheduled, Nothing](pc) {
+  this: EventPublisher[CommandScheduled] =>
 
   // Skip recovery
   override def recovery = Recovery(toSequenceNr = 0L)
