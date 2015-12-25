@@ -75,10 +75,7 @@ class SagaSpec extends TestKit(TestConfig.testSystem) with WordSpecLike with Imp
   }
 
   def toEventMessage(e: ValueChanged): EventMessage[DomainEvent] = {
-    EventMessage(e).addMetadataContent(Map(
-      CorrelationId -> processId,
-      DeliveryId -> 1L
-    ))
+    EventMessage(e).withDeliveryId(1L)
   }
 
   def ensureActorTerminated(actor: ActorRef) = {

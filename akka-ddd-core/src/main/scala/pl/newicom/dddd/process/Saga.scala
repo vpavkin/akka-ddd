@@ -1,22 +1,17 @@
 package pl.newicom.dddd.process
 
-import akka.actor.{ReceiveTimeout, ActorLogging, ActorPath, Props}
+import akka.actor.{ActorLogging, ActorPath, Props}
 import akka.contrib.pattern.ReceivePipeline
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor, RecoveryCompleted}
-import org.joda.time.DateTime
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, GracefulPassivation, PassivationConfig}
-import pl.newicom.dddd.aggregate
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.alod._
-import pl.newicom.dddd.messaging.MetaData.DeliveryId
-import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.event.EventMessage
 import pl.newicom.dddd.messaging.{Deduplication, Message}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.process.typesafe.InjectAny
-import pl.newicom.dddd.scheduling.ScheduleCommand
-import shapeless.ops.coproduct.{Unifier, Mapper}
 import shapeless._
+import shapeless.ops.coproduct.Mapper
 import shapeless.syntax.typeable._
 
 import scala.reflect.ClassTag
@@ -45,29 +40,13 @@ abstract class SagaConfig[S <: Saga[_]](val bpsName: String) extends OfficeInfo[
 }
 
 abstract class Saga[In <: Coproduct : ClassTag : InjectAny] extends BusinessEntity with GracefulPassivation with PersistentActor
-  with ReceivePipeline with Deduplication with AtLeastOnceDelivery with ActorLogging {
-
-  implicit class Deliver(actorPath: ActorPath) {
-    def !!(command: aggregate.Command): Unit =
-      deliverMsg(actorPath, CommandMessage(command).causedBy(eventMessage))
-
-    trait ScheduleBuilder {
-      def at(deadline: DateTime): Unit
-    }
-    def schedule(command: aggregate.Command) = new ScheduleBuilder {
-      override def at(deadline: DateTime): Unit = schedulingOffice.fold(throw new UnsupportedOperationException("Scheduling Office is not defined.")) {
-        _ !! ScheduleCommand("global", actorPath, deadline, command)
-      }
-    }
-  }
+  with ReceivePipeline with Deduplication with AtLeastOnceDelivery with AtLeastOnceDeliveryOps with ActorLogging {
 
   def sagaId = self.path.name
 
   override def id = sagaId
 
   override def persistenceId: String = sagaId
-
-  def schedulingOffice: Option[ActorPath] = None
 
   def sagaOffice: ActorPath = context.parent.path.parent
 
@@ -81,12 +60,6 @@ abstract class Saga[In <: Coproduct : ClassTag : InjectAny] extends BusinessEnti
   def handleDuplicated(m: Message) = acknowledgeEvent(m)
 
   override def receiveCommand: Receive = receiveDeliveryReceipt orElse receiveEventMessage orElse receiveUnexpected
-
-  def deliverMsg(office: ActorPath, msg: Message): Unit = {
-    deliver(office)(deliveryId => {
-      msg.withMetaAttribute(DeliveryId, deliveryId)
-    })
-  }
 
   def receiveDeliveryReceipt: Receive = {
     case receipt: Delivered =>
@@ -149,6 +122,7 @@ abstract class Saga[In <: Coproduct : ClassTag : InjectAny] extends BusinessEnti
    * Event handler called on state transition
    */
   def applyEvent: PartialFunction[DomainEvent, Unit]
+  def applyReceipt: PartialFunction[Delivered, Unit] = PartialFunction.empty
 
   private def updateStateWithEvent(em: EventMessage[DomainEvent]) = {
     messageProcessed(em)
@@ -158,7 +132,7 @@ abstract class Saga[In <: Coproduct : ClassTag : InjectAny] extends BusinessEnti
   private def updateStateWithDeliveryReceipt(receipt: Delivered) = {
     confirmDelivery(receipt.deliveryId)
     log.debug(s"Delivery of message confirmed (receipt: $receipt)")
-    applyEvent.applyOrElse(receipt, (e: DomainEvent) => ())
+    applyReceipt.applyOrElse(receipt, (e: Delivered) => ())
   }
 
   private def acknowledgeEvent(em: Message) {

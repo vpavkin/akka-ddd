@@ -9,9 +9,9 @@ import slick.driver.JdbcProfile
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class SqlViewHandler[-E <: DomainEvent](override val config: Config, override val vuConfig: SqlViewUpdateConfig[E])
+class SqlViewHandler[-E <: DomainEvent, O](override val config: Config, override val vuConfig: SqlViewUpdateConfig[E, O])
                     (implicit val profile: JdbcProfile, ex: ExecutionContext)
-  extends ViewHandler[E](vuConfig) with SqlViewStoreConfiguration with FutureHelpers {
+  extends ViewHandler[E, O](vuConfig) with SqlViewStoreConfiguration with FutureHelpers {
 
   private lazy val viewMetadataDao = new ViewMetadataDao
 

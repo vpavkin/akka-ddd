@@ -35,13 +35,9 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
   def subscribe(stream: EventStream, fromPosExcl: Option[Long]): InFlightMessagesCallback = {
 
     def eventSource: Source[EventReceived, Unit] = {
-      def withMetaData(eventData: EventData): EventMessage[DomainEvent] = {
-        val em = toEventMessage(eventData)
-        em.addMetadata(metaDataProvider(em))
-      }
       val streamId = StreamNameResolver.streamId(stream)
       log.debug(s"Subscribing to $streamId from position $fromPosExcl (exclusive)")
-      Source(
+      Source.fromPublisher(
         EsConnection(system).streamPublisher(
           streamId,
           fromPosExcl.map(l => Exact(l.toInt)),
@@ -49,14 +45,14 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
         )
       ).map {
         case EventRecord(_, number, eventData, _) =>
-          EventReceived(withMetaData(eventData), number.value)
+          EventReceived(toEventMessage(eventData), number.value)
         case ResolvedEvent(EventRecord(_, _, eventData, _), linkEvent) =>
-          EventReceived(withMetaData(eventData), linkEvent.number.value)
+          EventReceived(toEventMessage(eventData), linkEvent.number.value)
       }
     }
 
-   def flow: Flow[Trigger, EventReceived, Unit] = Flow.fromGraph(FlowGraph.create() { implicit b =>
-      import FlowGraph.Implicits._
+   def flow: Flow[Trigger, EventReceived, Unit] = Flow.fromGraph(GraphDSL.create() { implicit b =>
+      import GraphDSL.Implicits._
       val zip = b.add(ZipWith(Keep.left[EventReceived, Trigger]))
 
       eventSource ~> zip.in0

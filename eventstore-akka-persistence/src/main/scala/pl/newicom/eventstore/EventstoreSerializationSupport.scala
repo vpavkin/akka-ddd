@@ -40,12 +40,12 @@ trait EventstoreSerializationSupport {
       case x: PersistentRepr =>
         x.payload match {
           case em @ EventMessage(_, _) =>
-            val (event, mdOpt) = toPayloadAndMetadata(em)
+            val (event, md) = toPayloadAndMetadata(em)
             val eventType = classFor(event).getName
             EventData(
               eventType = eventType,
               data = toContent(x.withPayload(event), Some(eventType)),
-              metadata = mdOpt.fold(Empty)(md => toContent(md))
+              metadata = if (md.isEmpty) Empty else toContent(md)
             )
           case _ =>
             EventData(eventType = classFor(x).getName, data = toContent(x))
@@ -81,13 +81,13 @@ trait EventstoreSerializationSupport {
     pr.payload.asInstanceOf[EventMessage[DomainEvent]]
   }
 
-  private def toPayloadAndMetadata(em: EventMessage[DomainEvent]): (DomainEvent, Option[MetaData]) =
-    (em.event, em.addMetadataContent(Map("id" -> em.id, "timestamp" -> em.timestamp)).metadata)
+  private def toPayloadAndMetadata(em: EventMessage[DomainEvent]): (DomainEvent, MetaData) =
+    (em.event, em.metadata.addContent(Map("id" -> em.id, "timestamp" -> em.timestamp)))
 
   private def fromPayloadAndMetadata(payload: DomainEvent, metadata: MetaData): EventMessage[DomainEvent] = {
     val id: EntityId = metadata.get("id")
     val timestamp = DateTime.parse(metadata.get("timestamp"))
-    EventMessage(payload, id, timestamp).addMetadata(Some(metadata))
+    EventMessage(payload, id, timestamp).addMetadata(metadata)
   }
 
   private def deserialize[A: ClassTag](bytes: Array[Byte], eventType: Option[String] = None): A = {

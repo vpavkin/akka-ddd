@@ -2,14 +2,14 @@ package pl.newicom.dddd.office
 
 import pl.newicom.dddd.aggregate._
 
-trait AggregateContract[A] {
+trait OfficeContract[A] {
   type CommandImpl <: Command
   type EventImpl <: DomainEvent
   type ErrorImpl
 }
 
-object AggregateContract {
-  type Aux[A, Cmd <: Command, Evt <: DomainEvent, Err] = AggregateContract[A] {
+object OfficeContract {
+  type Aux[A, Cmd <: Command, Evt <: DomainEvent, Err] = OfficeContract[A] {
     type CommandImpl = Cmd
     type EventImpl = Evt
     type ErrorImpl = Err

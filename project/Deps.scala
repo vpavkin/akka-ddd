@@ -4,7 +4,7 @@ object Deps {
 
   object Version {
     val Akka                  = "2.4.2-SNAPSHOT"
-    val AkkaHttp              = "2.0-M2"
+    val AkkaHttp              = "2.0.1"
 
     val EventStoreClient      = "2.1.3-SNAPSHOT"
     val EventStoreAkkaJournal = "2.1.1-SNAPSHOT"
@@ -20,7 +20,7 @@ object Deps {
     val ScalaCheck            = "1.12.5"
 
     val LogbackClassic        = "1.1.3"
-    val nScalaTime            = "2.2.0"
+    val nScalaTime            = "2.6.0"
 
     val scalaz                = "7.1.4"
 

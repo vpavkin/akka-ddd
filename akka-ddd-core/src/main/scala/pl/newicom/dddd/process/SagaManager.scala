@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 class BusinessProcess
 
 object SagaManager {
-  implicit def businessProcessInfo(implicit sc: SagaConfig[_]): OfficeInfo[BusinessProcess] = {
+  implicit def businessProcessInfo[S <: Saga[_]](implicit sc: SagaConfig[S]): OfficeInfo[BusinessProcess] = {
     new OfficeInfo[BusinessProcess] {
       def name = sc.name
       override def isSagaOffice = true
@@ -21,10 +21,10 @@ object SagaManager {
 
 }
 
-class SagaManager(sagaConfig: SagaConfig[_], sagaOffice: ActorPath) extends Receptor {
+class SagaManager[S <: Saga[_]](sagaConfig: SagaConfig[S], sagaOffice: ActorPath) extends Receptor {
   this: EventStreamSubscriber =>
 
-  implicit val sc: SagaConfig[_] = sagaConfig
+  implicit val sc: SagaConfig[S] = sagaConfig
 
   lazy val config: ReceptorConfig =
     ReceptorBuilder().
@@ -33,10 +33,4 @@ class SagaManager(sagaConfig: SagaConfig[_], sagaOffice: ActorPath) extends Rece
   
   override def redeliverInterval = 30.seconds
   override def warnAfterNumberOfUnconfirmedAttempts = 15
-
-  override def metaDataProvider(em: EventMessage[DomainEvent]): Option[MetaData] =
-    sagaConfig.correlationIdResolver.lift(em.event).map { correlationId =>
-      new MetaData(Map(CorrelationId -> correlationId))
-    }
-
 }

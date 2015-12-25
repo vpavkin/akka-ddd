@@ -6,24 +6,25 @@ import pl.newicom.dddd.aggregate.{Command, EntityId}
 import pl.newicom.dddd.messaging.{MetaData, EntityMessage, Message}
 import pl.newicom.dddd.utils.UUIDSupport.uuid
 
-case class CommandMessage(
+trait CommandMessage extends Message with EntityMessage {
+  def command: Command
+  type MessageImpl <: CommandMessage
+  override def entityId: EntityId = command.aggregateId
+  override def payload: Any = command
+}
+
+private [command] case class CommandMessageImpl(
     command: Command,
     id: String = uuid,
     timestamp: Date = new Date,
-    metadata: Option[MetaData] = None)
-  extends Message with EntityMessage {
+    metadata: MetaData = MetaData.empty)
+  extends CommandMessage {
 
-  type MessageImpl = CommandMessage
+  type MessageImpl = CommandMessageImpl
 
-  override def entityId: EntityId = command.aggregateId
+  override def copyWithMetadata(m: MetaData): CommandMessageImpl = copy(metadata = m)
+}
 
-  override def payload: Any = command
-
-  override def copyWithMetadata(m: Option[MetaData]): CommandMessage = copy(metadata = m)
-
-  override def toString: String = {
-    val msgClass = getClass.getSimpleName
-    s"$msgClass(command = $command, id = $id, timestamp = $timestamp, metaData = $metadata)"
-  }
-
+object CommandMessage {
+  def apply(command: Command): CommandMessage = CommandMessageImpl(command)
 }

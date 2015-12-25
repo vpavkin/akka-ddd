@@ -154,5 +154,5 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
   def first[E](implicit wc: WhenContext[_], ct: ClassTag[E]): E =
     wc.pastEvents.first[E]
 
-  def commandMetaDataProvider(c: Command): Option[MetaData] = None
+  def commandMetaDataProvider(c: Command): MetaData = MetaData.empty
 }

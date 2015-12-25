@@ -1,9 +1,9 @@
-package pl.newicom.dddd.process.typesafe
+package pl.newicom.dddd.office
 
 import akka.actor.ActorPath
 
-trait OfficePath[O] {
-  def value: ActorPath
+sealed trait OfficePath[O] extends Serializable {
+  private [dddd] def value: ActorPath
 }
 
 object OfficePath {

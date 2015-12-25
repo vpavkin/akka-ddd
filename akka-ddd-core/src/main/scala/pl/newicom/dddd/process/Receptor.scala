@@ -10,7 +10,7 @@ import pl.newicom.dddd.messaging.event._
 import pl.newicom.dddd.messaging.{Message, MetaData}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.process.ReceptorConfig.{ReceiverResolver, StimuliSource, Transduction}
-import pl.newicom.dddd.persistence.{RegularSnapshottingConfig, RegularSnapshotting, ForgettingParticularEvents}
+import pl.newicom.dddd.persistence.{RegularSnapshottingConfig, RegularSnapshotting}
 
 object ReceptorConfig {
   type Transduction = PartialFunction[EventMessage[DomainEvent], Message]
@@ -65,8 +65,9 @@ case class ReceptorBuilder(
   def propagateTo(_receiver: ActorPath): ReceptorConfig = route({case _ => _receiver})
 }
 
-trait ReceptorPersistencePolicy extends ReceivePipeline with ForgettingParticularEvents with RegularSnapshotting {
+trait ReceptorPersistencePolicy extends ReceivePipeline with RegularSnapshotting {
   this: PersistentActor =>
+  override def journalPluginId = "akka.persistence.journal.inmem"
 }
 
 abstract class Receptor extends AtLeastOnceDeliverySupport with ReceptorPersistencePolicy {

@@ -10,10 +10,10 @@ import slick.driver.JdbcProfile
 
 import scala.concurrent.Future
 
-abstract class SqlViewUpdateService[E <: DomainEvent](implicit val profile: JdbcProfile) extends ViewUpdateService[E] with FutureHelpers {
+abstract class SqlViewUpdateService[E <: DomainEvent, O](implicit val profile: JdbcProfile) extends ViewUpdateService[E, O] with FutureHelpers {
   this: SqlViewStoreConfiguration =>
 
-  type VUConfig = SqlViewUpdateConfig[E]
+  type VUConfig = SqlViewUpdateConfig[E, O]
 
   override def ensureViewStoreAvailable: Future[Unit] = {
     viewStore.run(profile.defaultTables).mapToUnit
@@ -29,6 +29,6 @@ abstract class SqlViewUpdateService[E <: DomainEvent](implicit val profile: Jdbc
 
 
 
-  override def viewHandler(vuConfig: SqlViewUpdateConfig[E]): ViewHandler[E] =
+  override def viewHandler(vuConfig: SqlViewUpdateConfig[E, O]): ViewHandler[E, O] =
     new SqlViewHandler(config, vuConfig)
 }

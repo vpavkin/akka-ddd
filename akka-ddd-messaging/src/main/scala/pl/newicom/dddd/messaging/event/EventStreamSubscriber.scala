@@ -19,7 +19,7 @@ trait EventStreamSubscriber {
 
   /**
    * Subscribes this actor (the subscriber) to given event stream.
-   * The subscriber will receive events as [[EventReceived]] messages.
+   * The subscriber will receive events as [[EventStreamSubscriber.EventReceived]] messages.
    *
    * @param fromPositionExclusive if provided Subscriber will be receiving events
    *                              from given position (exclusively)
@@ -28,6 +28,4 @@ trait EventStreamSubscriber {
    *         This information could be used by event publisher to control the number of emitted events.
    */
   def subscribe(stream: EventStream, fromPositionExclusive: Option[Long]): InFlightMessagesCallback
-
-  def metaDataProvider(em: EventMessage[DomainEvent]): Option[MetaData]
 }

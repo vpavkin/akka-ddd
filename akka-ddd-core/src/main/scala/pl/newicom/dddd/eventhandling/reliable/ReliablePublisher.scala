@@ -4,14 +4,12 @@ import akka.actor._
 import akka.persistence.AtLeastOnceDelivery.{UnconfirmedDelivery, UnconfirmedWarning}
 import akka.persistence._
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.delivery.protocol.alod.Processed
+import pl.newicom.dddd.delivery.protocol.alod.Delivered
 import pl.newicom.dddd.eventhandling.EventPublisher
-import pl.newicom.dddd.messaging.MetaData.DeliveryId
 import pl.newicom.dddd.messaging.event.{DomainEventMessage, EventMessage}
 
 import scala.collection.immutable.Seq
 import scala.concurrent.duration._
-import scala.reflect.ClassTag
 
 trait ReliablePublisher[S, O, Cm <: Command, Ev <: DomainEvent, Er] extends PersistentActor with EventPublisher[Ev] with AtLeastOnceDelivery {
   this: AggregateRootActor[O, S, Cm, Ev, Er] =>
@@ -24,7 +22,7 @@ trait ReliablePublisher[S, O, Cm <: Command, Ev <: DomainEvent, Er] extends Pers
   override def warnAfterNumberOfUnconfirmedAttempts = 15
 
   override def publish(em: DomainEventMessage[Ev]) {
-    deliver(target)(deliveryId => em.withMetaAttribute(DeliveryId, deliveryId))
+    deliver(target)(deliveryId => em.withDeliveryId(deliveryId))
   }
 
   abstract override def receiveRecover: Receive = {
@@ -32,14 +30,14 @@ trait ReliablePublisher[S, O, Cm <: Command, Ev <: DomainEvent, Er] extends Pers
       super.receiveRecover(event)
       publish(toDomainEventMessage(event))
 
-    case Processed(deliveryId, _) =>
-      confirmDelivery(deliveryId)
+    case d: Delivered =>
+      confirmDelivery(d.deliveryId)
   }
 
   abstract override def receiveCommand: Receive = {
-    case receipt @ Processed(deliveryId, _) =>
-      persist(receipt) {
-        _ => confirmDelivery(deliveryId)
+    case d: Delivered =>
+      persist(d) {
+        _ => confirmDelivery(d.deliveryId)
       }
     case UnconfirmedWarning(unconfirmedDeliveries) =>
       receiveUnconfirmedDeliveries(unconfirmedDeliveries)

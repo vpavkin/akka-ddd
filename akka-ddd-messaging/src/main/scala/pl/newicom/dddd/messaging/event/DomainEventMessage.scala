@@ -7,7 +7,8 @@ import pl.newicom.dddd.utils.UUIDSupport._
 
 
 object DomainEventMessage {
-  def apply[E <: DomainEvent](em: EventMessage[E], snapshotId: AggregateSnapshotId): DomainEventMessage[E] = DomainEventMessage(snapshotId, em.event, em.id, em.timestamp, None)
+  def apply[E <: DomainEvent](em: EventMessage[E], snapshotId: AggregateSnapshotId): DomainEventMessage[E] =
+    DomainEventMessage(snapshotId, em.event, em.id, em.timestamp, em.metadata)
 }
 
 case class DomainEventMessage[+E <: DomainEvent](
@@ -15,7 +16,7 @@ case class DomainEventMessage[+E <: DomainEvent](
     event: E,
     id: String = uuid,
     timestamp: DateTime = new DateTime,
-    metadata: Option[MetaData] = None)
+    metadata: MetaData = MetaData.empty)
   extends EventMessage[E] {
 
   override type MessageImpl <: DomainEventMessage[E]
@@ -24,7 +25,7 @@ case class DomainEventMessage[+E <: DomainEvent](
 
 
 
-  override def copyWithMetadata(m: Option[MetaData]): MessageImpl = copy(metadata = m).asInstanceOf[MessageImpl]
+  override def copyWithMetadata(m: MetaData): MessageImpl = copy(metadata = m).asInstanceOf[MessageImpl]
 
   def aggregateId = snapshotId.aggregateId
 

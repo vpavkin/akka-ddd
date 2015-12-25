@@ -5,18 +5,16 @@ import pl.newicom.dddd.delivery.protocol.{Processed, Receipt, alod}
 import pl.newicom.dddd.messaging.MetaData._
 
 object MetaData {
-  val DeliveryId          = "_deliveryId"
-  val CausationId         = "causationId"
-  val CorrelationId       = "correlationId"
-  val SessionId           = "sessionId"
+  private [messaging] val DeliveryId          = "_deliveryId"
+  private [messaging] val CausationId         = "causationId"
 
   def empty: MetaData = MetaData(Map.empty)
 }
 
 case class MetaData(content: Map[String, Any]) extends Serializable {
 
-  def mergeWithMetadata(metadata: Option[MetaData]): MetaData = {
-    metadata.map(_.content).map(addContent).getOrElse(this)
+  def mergeWithMetadata(metadata: MetaData): MetaData = {
+    addContent(metadata.content)
   }
 
   def addContent(content: Map[String, Any]): MetaData = {
@@ -35,58 +33,36 @@ case class MetaData(content: Map[String, Any]) extends Serializable {
   }
 
   override def toString: String = content.toString()
+
+  def isEmpty: Boolean = content.isEmpty
 }
 
-trait Message extends Serializable {
+trait MetadataOps { self: Message =>
+  def causedBy(msg: Message): MessageImpl = withCausationId(msg.id)
 
-  def id: String
-
-  type MessageImpl <: Message
-
-  def copyWithMetadata(m: Option[MetaData]): MessageImpl
-  def metadata: Option[MetaData]
-
-  def causedBy(msg: Message): MessageImpl =
-    addMetadata(msg.metadataExceptDeliveryAttributes)
-      .withCausationId(msg.id).asInstanceOf[MessageImpl]
-
-  def metadataExceptDeliveryAttributes: Option[MetaData] = {
-    metadata.flatMap(_.exceptDeliveryAttributes)
+  def addMetadata(metadata: MetaData): MessageImpl = {
+    copyWithMetadata(this.metadata.mergeWithMetadata(metadata))
   }
 
-  def addMetadata(metadata: Option[MetaData]): MessageImpl = {
-    copyWithMetadata(this.metadata.map(_.mergeWithMetadata(metadata)).orElse(metadata))
-  }
 
-  def addMetadataContent(metadataContent: Map[String, Any]): MessageImpl = {
-    addMetadata(Some(MetaData(metadataContent)))
-  }
+  private def withMetaAttribute(attrName: String, value: Any): MessageImpl = addMetadata(MetaData(Map(attrName.toString -> value)))
 
-  def withMetaAttribute(attrName: String, value: Any): MessageImpl = addMetadataContent(Map(attrName.toString -> value))
-
-  def hasMetaAttribute(attrName: String) = metadata.exists(_.contains(attrName))
-
-  def getMetaAttribute[B](attrName: String): B = tryGetMetaAttribute[B](attrName).get
-
-  def tryGetMetaAttribute[B](attrName: String): Option[B] = if (metadata.isDefined) metadata.get.tryGet[B](attrName.toString) else None
+  private def getMetaAttribute[B](attrName: String): Option[B] = metadata.tryGet[B](attrName)
 
   def deliveryReceipt(result: Any = "OK"): Receipt = {
     deliveryId.map(id => alod.Processed(id, result)).getOrElse(Processed(result))
   }
 
-  def withDeliveryId(deliveryId: Long) = withMetaAttribute(DeliveryId, deliveryId)
+  def withDeliveryId(deliveryId: Long): MessageImpl = withMetaAttribute(DeliveryId, deliveryId)
 
-  def withCorrelationId(correlationId: EntityId) = withMetaAttribute(CorrelationId, correlationId)
+  def withCausationId(causationId: EntityId): MessageImpl = withMetaAttribute(CausationId, causationId)
 
-  def withCausationId(causationId: EntityId) = withMetaAttribute(CausationId, causationId)
+  def deliveryId: Option[Long] = getMetaAttribute[Long](DeliveryId)
+}
 
-  def withSessionId(sessionId: EntityId) = withMetaAttribute(SessionId, sessionId)
-
-  def deliveryId: Option[Long] = tryGetMetaAttribute[Any](DeliveryId).map {
-    case bigInt: scala.math.BigInt => bigInt.toLong
-    case l: Long => l
-  }
-
-  def correlationId: Option[EntityId] = tryGetMetaAttribute[EntityId](CorrelationId)
-
+trait Message extends MetadataOps with Serializable {
+  def id: String
+  type MessageImpl <: Message
+  def metadata: MetaData
+  def copyWithMetadata(m: MetaData): MessageImpl
 }

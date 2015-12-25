@@ -2,15 +2,14 @@ package pl.newicom.dddd
 
 import pl.newicom.dddd.aggregate.AggregateRoot
 import pl.newicom.dddd.messaging.event.ClerkEventStream
-import pl.newicom.dddd.office.{AggregateContract, OfficeInfo}
+import pl.newicom.dddd.office.{OfficeContract, OfficeInfo}
 
 package object scheduling {
-
   implicit val schedulingOffice: OfficeInfo[SchedulingOffice] = new OfficeInfo[SchedulingOffice] {
     def name: String = "deadlines"
   }
 
-  implicit val schedulingOfficeContract: AggregateContract[SchedulingOffice] = new AggregateContract[SchedulingOffice] {
+  implicit val contract: OfficeContract.Aux[SchedulingOffice, ScheduleCommand, CommandScheduled, Nothing] = new OfficeContract[SchedulingOffice] {
     override type CommandImpl = ScheduleCommand
     override type ErrorImpl = Nothing
     override type EventImpl = CommandScheduled
@@ -32,13 +31,12 @@ package object scheduling {
     override def processCommand(state: Unit): ProcessCommand = {
       case ScheduleCommand(bu, target, deadline, msg) =>
         val metadata = ScheduledCommandMetadata(
-          bu,
           target,
           deadline.withSecondOfMinute(0).withMillisOfSecond(0),
           deadline.getMillis
         )
         accept(
-          CommandScheduled(metadata, msg)
+          CommandScheduled(bu, metadata, msg)
         )
     }
     override def applyEvent(state: Unit): ApplyEvent = Function.const(state)

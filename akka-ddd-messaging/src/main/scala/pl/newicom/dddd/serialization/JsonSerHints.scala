@@ -53,7 +53,7 @@ case class JsonExtraSerHints(typeHints: TypeHints, serializers: List[Serializer[
 object JsonSerHints {
 
   val NoExtraHints = ExtraHints(NoTypeHints, List())
-  val DefaultSerializationHints = FinalizedHints(NoExtraHints, DefaultFormats ++ JodaTimeSerializers.all + UUIDSerializer)
+  val DefaultSerializationHints: FinalizedHints = FinalizedHints(NoExtraHints, DefaultFormats ++ JodaTimeSerializers.all + UUIDSerializer)
 
   def fromConfig(config: Config) = new FromConfigJsonSerializationHintsProvider(config).hints()
 

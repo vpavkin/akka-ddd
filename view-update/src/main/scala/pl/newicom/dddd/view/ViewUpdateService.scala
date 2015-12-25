@@ -23,24 +23,24 @@ object ViewUpdateService {
   case class InitiateViewUpdate(esCon: EsConnection)
   case class ViewUpdateInitiated(esCon: EsConnection)
 
-  case class ViewUpdateConfigured(viewUpdate: ViewUpdate)
+  case class ViewUpdateConfigured[O](viewUpdate: ViewUpdate[O])
 
   object EventReceived {
     def apply(eventData: EventData, eventNr: Long, lastEventNrOpt: Option[Long]): EventReceived =
-      EventReceived(eventData, eventNr, eventNr <= lastEventNrOpt.getOrElse(-1L))
+      EventReceived(eventData, eventNr, lastEventNrOpt.exists(eventNr <= _))
   }
 
   case class EventReceived(eventData: EventData, eventNr: Long, alreadyProcessed: Boolean)
 
-  case class ViewUpdate(officeInfo: OfficeInfo[_], lastEventNr: Option[Long], runnable: RunnableGraph[Future[Unit]]) {
+  case class ViewUpdate[O](officeInfo: OfficeInfo[O], lastEventNr: Option[Long], runnable: RunnableGraph[Future[Unit]]) {
     override def toString =  s"ViewUpdate(officeName = ${officeInfo.name}, lastEventNr = $lastEventNr)"
   }
 
 }
 
-abstract class ViewUpdateService[-E <: DomainEvent] extends Actor with EventstoreSerializationSupport with ActorLogging {
+abstract class ViewUpdateService[-E <: DomainEvent, O] extends Actor with EventstoreSerializationSupport with ActorLogging {
 
-  type VUConfig <: ViewUpdateConfig
+  type VUConfig <: ViewUpdateConfig[O]
 
   def system = context.system
 
@@ -50,7 +50,7 @@ abstract class ViewUpdateService[-E <: DomainEvent] extends Actor with Eventstor
 
   def vuConfigs: Seq[VUConfig]
 
-  def viewHandler(config: VUConfig): ViewHandler[E]
+  def viewHandler(config: VUConfig): ViewHandler[E, O]
 
   def ensureViewStoreAvailable: Future[Unit]
 
@@ -100,7 +100,7 @@ abstract class ViewUpdateService[-E <: DomainEvent] extends Actor with Eventstor
   }
 
 
-  def viewUpdate(esCon: EsConnection, vuConfig: VUConfig): Future[ViewUpdate] = {
+  def viewUpdate(esCon: EsConnection, vuConfig: VUConfig): Future[ViewUpdate[O]] = {
     val handler = viewHandler(vuConfig)
     val officeInfo = vuConfig.officeInfo
     handler.lastEventNumber.map { lastEvtNrOpt =>
@@ -113,16 +113,16 @@ abstract class ViewUpdateService[-E <: DomainEvent] extends Actor with Eventstor
               throw new RuntimeException(s"Unexpected msg received: $unexpected")
           }.filter {
             !_.alreadyProcessed
-          }.mapAsync(1) {
-            event => handler.handle(toDomainEventMessage(event.eventData), event.eventNr)
+          }.mapAsync(1) { event =>
+            handler.handle(toDomainEventMessage(event.eventData), event.eventNr)
           }.toMat(Sink.ignore)(Keep.right)
       )
     }
   }
 
-  def eventSource(esCon: EsConnection, oi: OfficeInfo[_], lastEvtNrOpt: Option[Long]): Source[Event, Unit] = {
+  def eventSource(esCon: EsConnection, oi: OfficeInfo[O], lastEvtNrOpt: Option[Long]): Source[Event, Unit] = {
     val streamId = StreamNameResolver.streamId(OfficeEventStream(oi))
-    Source(
+    Source.fromPublisher(
       esCon.streamPublisher(
         streamId,
         lastEvtNrOpt.map(nr => Exact(nr.toInt)),

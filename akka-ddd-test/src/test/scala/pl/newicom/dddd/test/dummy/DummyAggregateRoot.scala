@@ -3,10 +3,10 @@ package pl.newicom.dddd.test.dummy
 import java.util.UUID
 
 import pl.newicom.dddd.actor.PassivationConfig
-import pl.newicom.dddd.aggregate.{AggregateRootActor, AggregateRoot, Command, EntityId}
+import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.cluster.DefaultShardResolution
 import pl.newicom.dddd.eventhandling.EventPublisher
-import pl.newicom.dddd.office.{AggregateContract, OfficeInfo}
+import pl.newicom.dddd.office.{OfficeContract, OfficeInfo}
 import pl.newicom.dddd.utils.UUIDSupport
 
 object DummyAggregateRoot {
@@ -15,7 +15,7 @@ object DummyAggregateRoot {
   // Commands
   //
 
-  trait DummyOfficeContract extends AggregateContract[DummyOffice] {
+  trait DummyOfficeContract extends OfficeContract[DummyOffice] {
     override type CommandImpl = DummyCommand
     override type ErrorImpl = String
     override type EventImpl = DummyEvent
@@ -46,8 +46,10 @@ object DummyAggregateRoot {
   //
   // Events
   //
-  sealed trait DummyEvent {
+  sealed trait DummyEvent extends DomainEvent {
     def id: EntityId
+
+    override def aggregateId: EntityId = id
   }
   case class DummyCreated(id: EntityId, name: String, description: String, value: Int) extends DummyEvent
   case class NameChanged(id: EntityId, name: String) extends DummyEvent

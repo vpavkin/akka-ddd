@@ -3,22 +3,22 @@ package pl.newicom.dddd.aggregate
 import akka.actor.Status.Failure
 import akka.actor._
 import akka.contrib.pattern.ReceivePipeline
+import akka.pattern.pipe
 import akka.persistence._
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, GracefulPassivation, PassivationConfig}
 import pl.newicom.dddd.aggregate
-import pl.newicom.dddd.aggregate.error.AggregateRootNotInitializedException
-import pl.newicom.dddd.eventhandling.{EventPublisher, EventHandler}
+import pl.newicom.dddd.eventhandling.EventHandler
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.event.{AggregateSnapshotId, DomainEventMessage, EventMessage}
 import pl.newicom.dddd.messaging.{Deduplication, Message}
-import pl.newicom.dddd.office.{AggregateContract, OfficeInfo}
-import akka.pattern.pipe
+import pl.newicom.dddd.office.{OfficeContract, OfficeInfo}
+
+import scala.concurrent.duration.{Duration, _}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scalaz.\/
+import scala.util.Success
 import scalaz.Scalaz._
-import scala.concurrent.duration.{Duration, _}
-import scala.util.{Success, Try}
+import scalaz.\/
 
 sealed trait AggregateReaction[+Evt, +Err]
 object AggregateReaction {
@@ -29,8 +29,12 @@ object AggregateReaction {
 }
 
 
-trait AggregateRoot[Office] extends AggregateContract[Office] {
+trait AggregateRoot[Office] {
   import AggregateReaction._
+
+  type CommandImpl <: Command
+  type EventImpl <: DomainEvent
+  type ErrorImpl
 
   type State
   type CommandProcessingResult = AggregateReaction[EventImpl, ErrorImpl]
@@ -76,7 +80,7 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er](va
   private var stateOpt: Option[S] = None
   private var lastCommandMessage: Option[CommandMessage] = None
 
-  override def persistenceId: String = s"${officeInfo.name}-$id"
+  override def persistenceId: String = officeInfo.clerkGlobalId(id)
   override def id = self.path.name
 
   override def receiveRecover = {
@@ -122,8 +126,8 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er](va
     case _ => stash()
   }
 
-  private def raise(commandMessage: CommandMessage)(event: Ev) {
-    persist(EventMessage(event).causedBy(commandMessage)) { persisted =>
+  private def raise(causedBy: CommandMessage)(event: Ev) {
+    persist(EventMessage(event).causedBy(causedBy)) { persisted =>
       log.info("Event persisted: {}", event)
       updateState(persisted)
       handle(sender(), toDomainEventMessage(persisted))
@@ -139,7 +143,6 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er](va
 
   def toDomainEventMessage(persisted: EventMessage[Ev]): DomainEventMessage[Ev] =
     DomainEventMessage(persisted, AggregateSnapshotId(id, lastSequenceNr))
-      .addMetadata(persisted.metadata)
 
   override def handle(senderRef: ActorRef, eventMessage: DomainEventMessage[Ev]) {
     lastCommandMessage.foreach(acknowledgeCommandProcessed(Success(eventMessage.event.right[Er])))

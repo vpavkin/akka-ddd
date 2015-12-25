@@ -2,7 +2,6 @@ package pl.newicom.dddd.messaging.event
 
 import org.joda.time.DateTime
 import pl.newicom.dddd.aggregate.DomainEvent
-import pl.newicom.dddd.messaging.MetaData.CorrelationId
 import pl.newicom.dddd.messaging.{MetaData, EntityMessage, Message}
 import pl.newicom.dddd.utils.UUIDSupport._
 import shapeless.syntax.typeable._
@@ -13,7 +12,7 @@ object EventMessage {
     Some(em.id, em.event)
   }
 
-  def apply[E <: DomainEvent](event0: E, id0: String = uuid, timestamp0: DateTime = new DateTime, metaData0: Option[MetaData] = None): EventMessage[E] = new EventMessage[E] {
+  def apply[E <: DomainEvent](event0: E, id0: String = uuid, timestamp0: DateTime = new DateTime, metaData0: MetaData = MetaData.empty): EventMessage[E] = new EventMessage[E] {
 
     override def event: E = event0
 
@@ -23,9 +22,9 @@ object EventMessage {
 
     override type MessageImpl = EventMessage[E]
 
-    override def metadata: Option[MetaData] = metaData0
+    override def metadata: MetaData = metaData0
 
-    def copyWithMetadata(newMetaData: Option[MetaData]): MessageImpl = EventMessage(event, id, timestamp, newMetaData)
+    def copyWithMetadata(newMetaData: MetaData): MessageImpl = EventMessage(event, id, timestamp, newMetaData)
   }
 
   implicit def typeable[T <: DomainEvent](implicit castT: Typeable[T]): Typeable[EventMessage[T]] =
@@ -49,7 +48,7 @@ trait EventMessage[+E <: DomainEvent] extends Message with EntityMessage {
   def id: String
   def timestamp: DateTime
 
-  override def entityId = tryGetMetaAttribute[String](CorrelationId).orNull
+  override def entityId = event.aggregateId
   override def payload = event
 
   override def toString: String = {

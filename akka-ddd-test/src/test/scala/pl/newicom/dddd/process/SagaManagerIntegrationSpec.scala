@@ -47,7 +47,7 @@ class SagaManagerIntegrationSpec extends OfficeSpec[DummyOffice](Some(integratio
 
   implicit lazy val testSagaConfig = new DummySagaConfig(s"${DummyAggregateRoot.DummyOffice.info.name}-$dummyId")
 
-  implicit val sagaManagerFactory: SagaManagerFactory = (sagaConfig, sagaOffice) => {
+  implicit def sagaManagerFactory[S <: Saga[_]]: SagaManagerFactory[S] = (sagaConfig, sagaOffice) => {
     new SagaManager(sagaConfig, sagaOffice) with EventstoreSubscriber {
       override def redeliverInterval = 1.seconds
       override def receiveCommand: Receive = myReceive.orElse(super.receiveCommand)

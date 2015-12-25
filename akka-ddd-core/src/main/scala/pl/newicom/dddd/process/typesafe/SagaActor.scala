@@ -52,9 +52,7 @@ with ReceivePipeline with Deduplication with AtLeastOnceDelivery with ActorLoggi
   override def receiveCommand: Receive = receiveDeliveryReceipt orElse receiveEvent orElse receiveUnexpected
 
   def deliverMsg(office: ActorPath, msg: Message): Unit = {
-    deliver(office)(deliveryId => {
-      msg.withMetaAttribute(DeliveryId, deliveryId)
-    })
+    deliver(office)(deliveryId => msg.withDeliveryId(deliveryId))
   }
 
   def deliverCommand(office: ActorPath, command: Command): Unit = {
