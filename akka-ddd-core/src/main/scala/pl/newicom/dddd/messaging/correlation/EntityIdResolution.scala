@@ -9,7 +9,6 @@ object EntityIdResolution {
 }
 
 class EntityIdResolution[A] {
-
   def entityIdResolver: EntityIdResolver = {
     case em: EntityMessage => em.entityId
   }

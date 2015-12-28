@@ -51,7 +51,7 @@ class DummyOfficeWithGenSpec extends OfficeSpec[DummyOffice](Some(testSystem)) {
      */
     "create Dummy" in {
       when {
-        a [CreateDummy]
+        a[CreateDummy]
       }
       .expect { c =>
         DummyCreated(c.id, c.name, c.description, c.value)

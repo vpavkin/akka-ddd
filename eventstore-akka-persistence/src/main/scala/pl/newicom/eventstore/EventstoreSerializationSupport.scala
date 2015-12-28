@@ -58,17 +58,6 @@ trait EventstoreSerializationSupport {
     }
   }
 
-  def toPersistentRepr(event: EventData): PersistentRepr = {
-    val bytes = event.data.value.toArray[Byte]
-    val eventType = Some(event.eventType)
-    val repr = deserialize[PersistentRepr](bytes, eventType)
-    Some(event.metadata).collect {
-      case m if m.value.nonEmpty => deserialize[MetaData](m.value.toArray)
-    }.map { metadata =>
-      repr.withPayload(fromPayloadAndMetadata(repr.payload.asInstanceOf[DomainEvent], metadata))
-    }.getOrElse(repr)
-  }
-
   def toDomainEventMessage[E <: DomainEvent](eventData: EventData): DomainEventMessage[E] = {
     val pr = toPersistentRepr(eventData)
     val em = pr.payload.asInstanceOf[EventMessage[E]]
@@ -81,12 +70,23 @@ trait EventstoreSerializationSupport {
     pr.payload.asInstanceOf[EventMessage[DomainEvent]]
   }
 
+  def toPersistentRepr(event: EventData): PersistentRepr = {
+    val bytes = event.data.value.toArray[Byte]
+    val eventType = Some(event.eventType)
+    val repr = deserialize[PersistentRepr](bytes, eventType)
+    Some(event.metadata).collect {
+      case m if m.value.nonEmpty => deserialize[MetaData](m.value.toArray)
+    }.map { metadata =>
+      repr.withPayload(fromPayloadAndMetadata(repr.payload.asInstanceOf[DomainEvent], metadata))
+    }.getOrElse(repr)
+  }
+
   private def toPayloadAndMetadata(em: EventMessage[DomainEvent]): (DomainEvent, MetaData) =
     (em.event, em.metadata.addContent(Map("id" -> em.id, "timestamp" -> em.timestamp)))
 
   private def fromPayloadAndMetadata(payload: DomainEvent, metadata: MetaData): EventMessage[DomainEvent] = {
-    val id: EntityId = metadata.get("id")
-    val timestamp = DateTime.parse(metadata.get("timestamp"))
+    val id: EntityId = metadata.get[EntityId]("id").get
+    val timestamp = metadata.get[String]("timestamp").map(DateTime.parse).get
     EventMessage(payload, id, timestamp).addMetadata(metadata)
   }
 

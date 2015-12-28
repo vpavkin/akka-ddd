@@ -2,30 +2,17 @@ package pl.newicom.dddd.messaging.event
 
 import org.joda.time.DateTime
 import pl.newicom.dddd.aggregate.DomainEvent
-import pl.newicom.dddd.messaging.{MetaData, EntityMessage, Message}
+import pl.newicom.dddd.messaging.{EntityMessage, Message, MetaData}
 import pl.newicom.dddd.utils.UUIDSupport._
-import shapeless.syntax.typeable._
 import shapeless.Typeable
+import shapeless.syntax.typeable._
 
 object EventMessage {
   def unapply[E <: DomainEvent](em: EventMessage[E]): Option[(String, E)] = {
     Some(em.id, em.event)
   }
 
-  def apply[E <: DomainEvent](event0: E, id0: String = uuid, timestamp0: DateTime = new DateTime, metaData0: MetaData = MetaData.empty): EventMessage[E] = new EventMessage[E] {
-
-    override def event: E = event0
-
-    override def timestamp: DateTime = timestamp0
-
-    override def id: String = id0
-
-    override type MessageImpl = EventMessage[E]
-
-    override def metadata: MetaData = metaData0
-
-    def copyWithMetadata(newMetaData: MetaData): MessageImpl = EventMessage(event, id, timestamp, newMetaData)
-  }
+  def apply[E <: DomainEvent](event: E, id: String = uuid, timestamp: DateTime = new DateTime, metaData: MetaData = MetaData.empty) = DefaultEventMessage(event, id, timestamp, metaData)
 
   implicit def typeable[T <: DomainEvent](implicit castT: Typeable[T]): Typeable[EventMessage[T]] =
     new Typeable[EventMessage[T]]{
@@ -36,23 +23,51 @@ object EventMessage {
           o.event.cast[T].map(_ => t.asInstanceOf[EventMessage[T]])
         } else None
       }
-      def describe = s"Option[${castT.describe}]"
+      def describe = s"EventMessage[${castT.describe}]"
     }
 }
 
-trait EventMessage[+E <: DomainEvent] extends Message with EntityMessage {
+case class DefaultEventMessage[+E <: DomainEvent](event: E, id: String, timestamp: DateTime, metadata: MetaData) extends EventMessage[E] {
+//  override type MessageImpl = this.type
 
-  type MessageImpl <: EventMessage[E]
+  override def withDeliveryId(deliveryId: Long): Message = copy(metadata = metadata.withDeliveryId(deliveryId))
 
+  override def deliveryId: Option[Long] = metadata.deliveryId
+
+  def addMetadata(other: MetaData): EventMessage[E] = copy(metadata = metadata.mergeWithMetadata(other))
+  def causedBy(msg: Message): EventMessage[E] = copy(metadata = metadata.withCausationId(msg.id))
+}
+
+sealed trait EventMessage[+E <: DomainEvent] extends Message with EntityMessage {
   def event: E
   def id: String
   def timestamp: DateTime
-
   override def entityId = event.aggregateId
   override def payload = event
+}
 
-  override def toString: String = {
-    val msgClass = getClass.getSimpleName
-    s"$msgClass(event = $event, id = $id, timestamp = $timestamp, metaData = $metadata)"
-  }
+object DomainEventMessage {
+  def apply[E <: DomainEvent](em: EventMessage[E], snapshotId: AggregateSnapshotId): DomainEventMessage[E] =
+    DomainEventMessage(snapshotId, em.event, em.id, em.timestamp, em.metadata)
+}
+
+case class DomainEventMessage[+E <: DomainEvent](
+                                                  snapshotId: AggregateSnapshotId,
+                                                  event: E,
+                                                  id: String = uuid,
+                                                  timestamp: DateTime = new DateTime,
+                                                  metadata: MetaData = MetaData.empty)
+  extends EventMessage[E] {
+
+  override def entityId = aggregateId
+
+
+  def aggregateId = snapshotId.aggregateId
+
+  def sequenceNr = snapshotId.sequenceNr
+
+  override def deliveryId: Option[Long] = metadata.deliveryId
+
+  override def withDeliveryId(deliveryId: Long): Message = copy(metadata = metadata.withDeliveryId(deliveryId))
+  def addMetadata(other: MetaData): DomainEventMessage[E] = copy(metadata = metadata.mergeWithMetadata(other))
 }

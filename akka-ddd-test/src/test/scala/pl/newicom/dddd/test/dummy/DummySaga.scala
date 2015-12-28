@@ -5,13 +5,13 @@ import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.messaging.correlation.EntityIdResolution
 import pl.newicom.dddd.messaging.event.EventMessage
-import pl.newicom.dddd.office.OfficeInfo
-import pl.newicom.dddd.process.{Saga, SagaActorFactory, SagaConfig}
-import pl.newicom.dddd.test.dummy.DummyAggregateRoot.{DummyCreated, ValueChanged}
+import pl.newicom.dddd.office.{OfficePath, OfficeInfo}
+import pl.newicom.dddd.process.EventDecision.Accept
+import pl.newicom.dddd.process._
+import pl.newicom.dddd.test.dummy.DummyAggregateRoot.{DummyOffice, DummyCreated, ValueChanged}
 import pl.newicom.dddd.test.dummy.DummySaga.{EventApplied, DummyCommand}
 import shapeless.ops.coproduct.Mapper.Aux
 import shapeless.{Poly1, :+:, CNil}
-
 object DummySaga {
 
   implicit def defaultSagaIdResolution[A]: EntityIdResolution[A] = new EntityIdResolution[A]
@@ -46,49 +46,36 @@ object DummySaga {
  */
 
 
-class DummySaga(override val pc: PassivationConfig, dummyOffice: Option[ActorPath]) extends Saga[ValueChanged :+: CNil] {
+class DummySaga(dummyOffice: Option[OfficePath[DummyOffice]]) extends SagaConfig {
 
-  override def persistenceId: String = s"DummySaga-$id"
 
-  var counter: Int = 0
+
+  override def name: String = "DummySaga"
+  override type Input = DummyCreated :+: ValueChanged :+: CNil
+  override type State = Int
+  object resolveId extends ResolveId {
+    implicit val atDC = at[DummyCreated](_.id)
+    implicit val atVC = at[ValueChanged](_.id)
+  }
+
 
   def applyEvent = {
     case e @ ValueChanged(id, value, _) =>
-      counter = value
-      context.system.eventStream.publish(EventApplied(e))
-      log.debug(s"Applied event message: ${eventMessage}")
-      if (dummyOffice.isDefined) {
-        deliverCommand(dummyOffice.get, DummyCommand(id, counter))
-      }
+      dummyOffice.foreach(_ !! DummyCommand(id, counter))
+
   }
 
 
-  object receiveEvent extends Poly1 {
+  object applyEvent extends ApplyEvent[State] {
+    implicit val atVC = at[ValueChanged] { case ValueChanged(id, value, _) => state =>
+      changeState(value) and (dummyOffice.map(_ !! DummyCommand(id, state.getOrElse(0))).getOrElse(ignore))
+    }
+  }
 
+  object receiveEvent extends ReceiveEvent[State] {
+    implicit val atVC = at[ValueChanged] { case (state, e) => if (state.map(_ + 1).contains(e.value)) accept else ignore }
+    implicit val atDC = at[DummyCreated] { case (state, e) => if (state.isEmpty) accept else ignore }
   }
 
   override implicit def mapper: Aux[receiveEvent.type, :+:[ValueChanged, CNil], :+:[Unit, CNil]] = ???
-
-  def receiveEvent: Receive = {
-    case em @ EventMessage(_, ValueChanged(_, value: Int, _)) if counter + 1 == value =>
-      raise(em)
-      log.debug(s"Processed event: $em")
-    case em @ EventMessage(_, DummyCreated(_, _, _, _)) =>
-      raise(em)
-    case other =>
-      log.debug(other.toString)
-  }
-
-  // alternative implementation
-  /*
-      def receiveEvent: Receive = {
-        case em: EventMessage => em.event match {
-          case ValueChanged(_, value: Int) if currentValue + 1 == value =>
-            raise(em)
-            log.debug(s"Processed event: $em")
-          case dc: DummyCreated => // ignore
-          case _ => handleUnexpectedEvent(em)
-        }
-      }
-    */
 }

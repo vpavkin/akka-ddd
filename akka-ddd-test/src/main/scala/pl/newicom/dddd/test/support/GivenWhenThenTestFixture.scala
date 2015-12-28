@@ -71,7 +71,7 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
 
     def when[C <: Command](wc: WhenContext[C]): When[C] = when(wc, () => {
       val command: C = wc.command
-      val cm = CommandMessage(command).addMetadata(commandMetaDataProvider(command))
+      val cm = CommandMessage(command)
       officeUnderTest ! cm
     })
 
@@ -135,7 +135,7 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
     Given(
       givenFun = () => {
         cs.map { c =>
-          val cm = CommandMessage(c).addMetadata(commandMetaDataProvider(c))
+          val cm = CommandMessage(c)
           Await.result((officeUnderTest ? cm).mapTo[Processed], timeout.duration)
         }
       }
@@ -153,6 +153,4 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
 
   def first[E](implicit wc: WhenContext[_], ct: ClassTag[E]): E =
     wc.pastEvents.first[E]
-
-  def commandMetaDataProvider(c: Command): MetaData = MetaData.empty
 }

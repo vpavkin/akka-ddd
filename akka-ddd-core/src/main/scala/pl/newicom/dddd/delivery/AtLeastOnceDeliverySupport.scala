@@ -26,7 +26,7 @@ trait AtLeastOnceDeliverySupport extends PersistentActor with AtLeastOnceDeliver
 
   def deliveryIdToMessage(msg: Message): Long ⇒ Any = { internalDeliveryId => {
       val deliveryId = msg.deliveryId.get
-      log.debug(s"[DELIVERY-ID: $deliveryId] Delivering: $msg")
+      log.debug("Delivery-Id: [{}] Delivering: [{}]", deliveryId, msg)
       deliveryState = deliveryState.withSent(internalDeliveryId, deliveryId)
       msg
     }

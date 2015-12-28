@@ -2,7 +2,7 @@ package pl.newicom.dddd.process
 
 import akka.actor._
 import akka.testkit.TestProbe
-import pl.newicom.dddd.actor.PassivationConfig
+import pl.newicom.dddd.actor.{BusinessEntityActorFactory, PassivationConfig}
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.Processed
 import pl.newicom.dddd.eventhandling.LocalPublisher
@@ -23,8 +23,8 @@ object SagaManagerIntegrationSpec {
 
   case object GetNumberOfUnconfirmed
 
-  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyOffice] =
-    new AggregateRootActorFactory[DummyOffice] {
+  implicit def actorFactory(implicit it: Duration = 1.minute): BusinessEntityActorFactory[DummyOffice] =
+    new BusinessEntityActorFactory[DummyOffice] {
       override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
@@ -47,7 +47,7 @@ class SagaManagerIntegrationSpec extends OfficeSpec[DummyOffice](Some(integratio
 
   implicit lazy val testSagaConfig = new DummySagaConfig(s"${DummyAggregateRoot.DummyOffice.info.name}-$dummyId")
 
-  implicit def sagaManagerFactory[S <: Saga[_]]: SagaManagerFactory[S] = (sagaConfig, sagaOffice) => {
+  implicit def sagaManagerFactory[S <: Saga[_, _]]: SagaManagerFactory[S] = (sagaConfig, sagaOffice) => {
     new SagaManager(sagaConfig, sagaOffice) with EventstoreSubscriber {
       override def redeliverInterval = 1.seconds
       override def receiveCommand: Receive = myReceive.orElse(super.receiveCommand)

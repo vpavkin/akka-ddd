@@ -44,10 +44,8 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
           resolveLinkTos = true
         )
       ).map {
-        case EventRecord(_, number, eventData, _) =>
-          EventReceived(toEventMessage(eventData), number.value)
-        case ResolvedEvent(EventRecord(_, _, eventData, _), linkEvent) =>
-          EventReceived(toEventMessage(eventData), linkEvent.number.value)
+        case EventRecord(_, number, eventData, _) => EventReceived(toEventMessage(eventData), number.value)
+        case ResolvedEvent(EventRecord(_, _, eventData, _), linkEvent) => EventReceived(toEventMessage(eventData), linkEvent.number.value)
       }
     }
 
@@ -60,9 +58,8 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
     })
 
     val sink = Sink.actorRef(self, onCompleteMessage = Kill)
-    val triggerSource = Source.actorRef(bufferSize, OverflowStrategy.dropNew)
-    val triggerActor = flow.toMat(sink)(Keep.both).runWith(triggerSource)
-
+    val flowSink = flow.toMat(sink)(Keep.both)
+    val triggerActor = Source.actorRef(bufferSize, OverflowStrategy.dropNew).to(flowSink).run
     new DemandController(triggerActor, bufferSize)
   }
 

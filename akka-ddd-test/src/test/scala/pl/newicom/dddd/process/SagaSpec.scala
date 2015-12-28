@@ -6,6 +6,7 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, WordSpecLike}
 import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.alod.Delivered
+import pl.newicom.dddd.messaging.Message
 import pl.newicom.dddd.messaging.MetaData._
 import pl.newicom.dddd.messaging.event.EventMessage
 import pl.newicom.dddd.office.LocalOffice._
@@ -74,7 +75,7 @@ class SagaSpec extends TestKit(TestConfig.testSystem) with WordSpecLike with Imp
     }
   }
 
-  def toEventMessage(e: ValueChanged): EventMessage[DomainEvent] = {
+  def toEventMessage(e: ValueChanged): Message = {
     EventMessage(e).withDeliveryId(1L)
   }
 

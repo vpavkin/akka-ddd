@@ -8,9 +8,9 @@ import pl.newicom.dddd.utils.UUIDSupport.uuid
 
 trait CommandMessage extends Message with EntityMessage {
   def command: Command
-  type MessageImpl <: CommandMessage
   override def entityId: EntityId = command.aggregateId
   override def payload: Any = command
+  def causedBy(msg: Message): CommandMessage
 }
 
 private [command] case class CommandMessageImpl(
@@ -20,9 +20,11 @@ private [command] case class CommandMessageImpl(
     metadata: MetaData = MetaData.empty)
   extends CommandMessage {
 
-  type MessageImpl = CommandMessageImpl
+  override def deliveryId: Option[Long] = metadata.deliveryId
 
-  override def copyWithMetadata(m: MetaData): CommandMessageImpl = copy(metadata = m)
+  override def withDeliveryId(deliveryId: Long): Message = copy(metadata = metadata.withDeliveryId(deliveryId))
+
+  override def causedBy(msg: Message): CommandMessage = copy(metadata = metadata.withCausationId(msg.id))
 }
 
 object CommandMessage {

@@ -5,12 +5,12 @@ import akka.actor._
 import akka.contrib.pattern.ReceivePipeline
 import akka.pattern.pipe
 import akka.persistence._
-import pl.newicom.dddd.actor.{BusinessEntityActorFactory, GracefulPassivation, PassivationConfig}
-import pl.newicom.dddd.aggregate
+import pl.newicom.dddd.actor.{GracefulPassivation, PassivationConfig}
 import pl.newicom.dddd.eventhandling.EventHandler
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.event.{AggregateSnapshotId, DomainEventMessage, EventMessage}
 import pl.newicom.dddd.messaging.{Deduplication, Message}
+import pl.newicom.dddd.office.OfficeContract.Aux
 import pl.newicom.dddd.office.{OfficeContract, OfficeInfo}
 
 import scala.concurrent.duration.{Duration, _}
@@ -29,14 +29,9 @@ object AggregateReaction {
 }
 
 
-trait AggregateRoot[Office] {
+trait AggregateRootBehavior[State, CommandImpl <: Command, EventImpl <: DomainEvent, ErrorImpl] {
   import AggregateReaction._
 
-  type CommandImpl <: Command
-  type EventImpl <: DomainEvent
-  type ErrorImpl
-
-  type State
   type CommandProcessingResult = AggregateReaction[EventImpl, ErrorImpl]
   type ProcessCommand = CommandImpl => CommandProcessingResult
   type ApplyEvent = EventImpl => State
@@ -54,22 +49,25 @@ trait AggregateRoot[Office] {
   def ignore: CommandProcessingResult = Ignore
 }
 
-object AggregateRoot {
-  type Aux[O, S0, CommandImpl0 <: Command, EventImpl0 <: aggregate.DomainEvent, ErrorImpl0] = AggregateRoot[O] {
-  type State =  S0
-    type EventImpl = EventImpl0
-    type CommandImpl = CommandImpl0
-    type ErrorImpl = ErrorImpl0
+abstract class AggregateRootActorFactory {
+  def create[O, S, Cm <: Command, Ev <: DomainEvent, Er]
+  (pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])
+  (implicit officeInfo: OfficeInfo[O], contract: OfficeContract.Aux[O, Cm, Ev, Er],  ev: ClassTag[Ev], cm: ClassTag[Cm]): AggregateRootActor[O, S, Cm, Ev, Er]
+  def inactivityTimeout: Duration = 1.minute
+
+}
+
+object AggregateRootActorFactory {
+  def default: AggregateRootActorFactory = new AggregateRootActorFactory {
+    override def create[O, S, Cm <: Command, Ev <: DomainEvent, Er](pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])(implicit officeInfo: OfficeInfo[O], contract: Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], cm: ClassTag[Cm]) =
+      new AggregateRootActor[O, S, Cm, Ev, Er](pc, behavior) {}
   }
 }
 
-abstract class AggregateRootActorFactory[A] extends BusinessEntityActorFactory[A] {
-  def props(pc: PassivationConfig): Props
-  def inactivityTimeout: Duration = 1.minute
-}
-
-abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er](val pc: PassivationConfig)(implicit behavior: AggregateRoot.Aux[O, S, Cm, Ev, Er], officeInfo: OfficeInfo[O], ev: ClassTag[Ev], cm: ClassTag[Cm])
-  extends BusinessEntity with GracefulPassivation with PersistentActor with Stash
+abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
+(val pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])
+(implicit officeInfo: OfficeInfo[O], contract: OfficeContract.Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], cm: ClassTag[Cm])
+  extends GracefulPassivation with PersistentActor with Stash
   with EventHandler[Ev] with ReceivePipeline with Deduplication with ActorLogging {
 
   import AggregateReaction._
@@ -81,7 +79,7 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er](va
   private var lastCommandMessage: Option[CommandMessage] = None
 
   override def persistenceId: String = officeInfo.clerkGlobalId(id)
-  override def id = self.path.name
+  def id = self.path.name
 
   override def receiveRecover = {
     case em: EventMessage[Ev] => updateState(em)

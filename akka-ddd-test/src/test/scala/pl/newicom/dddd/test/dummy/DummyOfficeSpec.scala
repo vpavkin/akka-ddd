@@ -1,7 +1,7 @@
 package pl.newicom.dddd.test.dummy
 
 import akka.actor.Props
-import pl.newicom.dddd.actor.PassivationConfig
+import pl.newicom.dddd.actor.{BusinessEntityActorFactory, PassivationConfig}
 import pl.newicom.dddd.aggregate.AggregateRootActorFactory
 import pl.newicom.dddd.eventhandling.LocalPublisher
 import pl.newicom.dddd.test.dummy.DummyAggregateRoot._
@@ -12,8 +12,8 @@ import scalaz._
 import scala.concurrent.duration.{Duration, _}
 
 object DummyOfficeSpec {
-  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyOffice] =
-    new AggregateRootActorFactory[DummyOffice] {
+  implicit def actorFactory(implicit it: Duration = 1.minute): BusinessEntityActorFactory[DummyOffice] =
+    new BusinessEntityActorFactory[DummyOffice] {
       override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }

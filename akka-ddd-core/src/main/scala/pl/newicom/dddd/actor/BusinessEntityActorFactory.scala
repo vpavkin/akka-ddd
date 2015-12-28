@@ -11,3 +11,11 @@ abstract class BusinessEntityActorFactory[O] {
   def props(pc: PassivationConfig): Props
   def inactivityTimeout: Duration
 }
+
+object BusinessEntityActorFactory {
+  def apply[O](inactivityTimeout0: Duration)(f: PassivationConfig => Props): BusinessEntityActorFactory[O] = new BusinessEntityActorFactory[O] {
+    override def props(pc: PassivationConfig): Props = f(pc)
+
+    override def inactivityTimeout: Duration = inactivityTimeout0
+  }
+}

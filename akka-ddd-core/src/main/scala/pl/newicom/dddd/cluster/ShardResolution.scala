@@ -12,16 +12,11 @@ object ShardResolution {
   type ShardResolutionStrategy = EntityIdResolver => ExtractShardId
 }
 
-trait ShardResolution[A] extends EntityIdResolution[A] {
-
+trait ShardResolution[A] {
   def shardResolutionStrategy: ShardResolutionStrategy
-
-  def shardResolver: ExtractShardId = shardResolutionStrategy(entityIdResolver)
-
-  val idExtractor: ExtractEntityId = {
+  def idExtractor(entityIdResolver: EntityIdResolver): ExtractEntityId = {
     case em: EntityMessage => (entityIdResolver(em), em)
     case c: Command => (entityIdResolver(c), CommandMessage(c))
   }
-
 }
 

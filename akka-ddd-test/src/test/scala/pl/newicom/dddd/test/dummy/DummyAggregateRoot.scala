@@ -25,8 +25,14 @@ object DummyAggregateRoot {
   trait DummyOffice
 
   object DummyOffice {
-    implicit val info = new OfficeInfo[DummyOffice] with DummyOfficeContract {
+    implicit val info = new OfficeInfo[DummyOffice] {
       override def name: String = "Dummy"
+    }
+
+    implicit val tc: OfficeContract.Aux[DummyOffice, DummyCommand, DummyEvent, String] = new OfficeContract[DummyOffice] {
+      override type CommandImpl = DummyCommand
+      override type ErrorImpl = String
+      override type EventImpl = DummyEvent
     }
     implicit def defaultShardResolution = new DefaultShardResolution[DummyOffice]
   }
@@ -64,7 +70,7 @@ object DummyAggregateRoot {
     def bumpVersion: DummyState = copy(version = version + 1)
   }
 
-  implicit val instance = new AggregateRoot[DummyOffice] with DummyOfficeContract with UUIDSupport {
+  object DummyBehavior extends AggregateRootBehavior[DummyState, DummyCommand, DummyEvent, String] with UUIDSupport {
     type State = DummyState
     override def processFirstCommand: ProcessFirstCommand = {
       case CreateDummy(id, name, description, value) =>
@@ -106,7 +112,7 @@ object DummyAggregateRoot {
         }
     }
 
-    override def applyEvent(state: DummyState): ApplyEvent = { e: EventImpl => e match {
+    override def applyEvent(state: DummyState): ApplyEvent = { e: DummyEvent => e match {
       case ValueChanged(_, newValue, _) =>
         state.copy(value = newValue, candidateValue = None)
       case ValueGenerated(_, newValue, confirmationToken) =>
@@ -124,5 +130,5 @@ object DummyAggregateRoot {
 
 import DummyAggregateRoot._
 
-class DummyAggregateRoot extends AggregateRootActor[DummyOffice, DummyState, DummyCommand, DummyEvent, String](PassivationConfig()) { this: EventPublisher[DummyEvent] =>
+class DummyAggregateRoot extends AggregateRootActor[DummyOffice, DummyState, DummyCommand, DummyEvent, String](PassivationConfig(), DummyBehavior) { this: EventPublisher[DummyEvent] =>
 }

@@ -1,4 +1,4 @@
-package pl.newicom.dddd.test.support
+package pl.newicom.dddd.test.support.behavior
 
 import akka.actor._
 import akka.testkit.TestKit
@@ -6,37 +6,40 @@ import org.scalacheck.Gen
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, WordSpecLike}
 import org.slf4j.LoggerFactory.getLogger
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, CreationSupport}
-import pl.newicom.dddd.aggregate.{Command, EntityId}
-import pl.newicom.dddd.cluster.ShardResolution
-import pl.newicom.dddd.messaging.correlation.AggregateIdResolution
+import pl.newicom.dddd.aggregate.{DomainEvent, AggregateRootBehavior, Command, EntityId}
+import pl.newicom.dddd.messaging.correlation.{EntityIdResolution, AggregateIdResolution}
 import pl.newicom.dddd.office.Office._
-import pl.newicom.dddd.office.{LocalOffice, OfficeInfo}
+import pl.newicom.dddd.office.{OfficeFactory, OfficeContract, OfficeInfo}
+import pl.newicom.dddd.test.support.GivenWhenThenTestFixture
 import pl.newicom.dddd.test.support.OfficeSpec.sys
 import pl.newicom.dddd.utils.UUIDSupport._
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
-import LocalOffice._
 
-object OfficeSpec {
-  def sys(arClass: Class[_]) = ActorSystem(s"${arClass.getSimpleName}OfficeSpec_$uuid7")
+object BehaviorSpec {
+  def sys(arClass: Class[_]) = ActorSystem(s"${arClass.getSimpleName}BehaviorSpec_$uuid7")
 }
 
 /**
  * @param shareAggregateRoot if set to true, the same AR instance will be used in all tests, default is false
  */
-abstract class OfficeSpec[A : BusinessEntityActorFactory : OfficeInfo : ShardResolution](_system: Option[ActorSystem] = None, val shareAggregateRoot: Boolean = false)(implicit arClassTag: ClassTag[A])
+abstract class BehaviorSpec[A : BusinessEntityActorFactory : OfficeInfo : OfficeFactory, S, Cmd <: Command : ClassTag, Evt <: DomainEvent : ClassTag, Err](_system: Option[ActorSystem] = None, val shareAggregateRoot: Boolean = false)
+                                                                                                                                                                               (implicit arClassTag: ClassTag[A], contract: OfficeContract.Aux[A, Cmd, Evt, Err])
   extends GivenWhenThenTestFixture(_system.getOrElse(sys(arClassTag.runtimeClass))) with WordSpecLike with BeforeAndAfterAll with BeforeAndAfter {
 
   val logger = getLogger(getClass)
 
   val domain = arClassTag.runtimeClass.getSimpleName
 
+
   override def officeUnderTest: ActorRef = {
-    if (_officeUnderTest == null) _officeUnderTest = office[A]
+    if (_officeUnderTest == null) _officeUnderTest = ???
     _officeUnderTest
   }
+
+  val behavior: AggregateRootBehavior[S, Cmd, Evt, Err]
 
   private var _officeUnderTest: ActorRef = null
 

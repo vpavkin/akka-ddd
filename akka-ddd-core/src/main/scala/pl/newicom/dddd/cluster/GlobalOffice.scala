@@ -7,52 +7,38 @@ import akka.cluster.sharding.{ClusterShardingSettings, ClusterSharding}
 import akka.cluster.sharding.ShardRegion.Passivate
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, PassivationConfig}
 import pl.newicom.dddd.aggregate._
+import pl.newicom.dddd.messaging.correlation.EntityIdResolution
 import pl.newicom.dddd.office.{OfficeInfo, OfficeFactory}
 
 import scala.reflect.ClassTag
+import scala.util.Try
 
 trait GlobalOffice {
 
   implicit def globalOfficeFactory[O]
   (implicit
    system: ActorSystem,
-   sr: ShardResolution[O],
-   entityFactory: BusinessEntityActorFactory[O],
-   officeInfo: OfficeInfo[O]
+   shardResolution: ShardResolution[O]
   ): OfficeFactory[O] = {
     new OfficeFactory[O] {
 
-      def officeName: EntityId = officeInfo.name
-
-      val shardSettings = ClusterShardingSettings(system)
-
-      private def region: Option[ActorRef] = {
-        try {
-          Some(ClusterSharding(system).shardRegion(officeName))
-        } catch {
-          case ex: IllegalArgumentException => None
-        }
+      override def getOrCreate(name: String, entityFactory: BusinessEntityActorFactory[O], entityIdResolution: EntityIdResolution[O]): ActorRef = {
+        region(name).getOrElse(createRegion(name, entityFactory, entityIdResolution))
       }
 
-      override def getOrCreate: ActorRef = {
-        region.getOrElse {
-          startSharding(shardSettings)
-          region.get
-        }
-      }
+      private def region(name: String): Option[ActorRef] = Try(ClusterSharding(system).shardRegion(name)).toOption
 
-
-
-      private def startSharding(shardSettings: ClusterShardingSettings): Unit = {
+      private def createRegion(name: String, entityFactory: BusinessEntityActorFactory[O], entityIdResolution: EntityIdResolution[O]): ActorRef = {
         val entityProps = entityFactory.props(new PassivationConfig(Passivate(PoisonPill), entityFactory.inactivityTimeout))
-        ClusterSharding(system).start(
-          typeName = officeName,
+        val region = ClusterSharding(system).start(
+          typeName = name,
           entityProps = entityProps,
-          settings = shardSettings,
-          extractEntityId = sr.idExtractor,
-          extractShardId = sr.shardResolver)
-
-        ClusterClientReceptionist(system).registerService(region.get)
+          settings = ClusterShardingSettings(system),
+          extractEntityId = shardResolution.idExtractor(entityIdResolution.entityIdResolver),
+          extractShardId = shardResolution.shardResolutionStrategy(entityIdResolution.entityIdResolver)
+        )
+        ClusterClientReceptionist(system).registerService(region)
+        region
       }
 
     }
