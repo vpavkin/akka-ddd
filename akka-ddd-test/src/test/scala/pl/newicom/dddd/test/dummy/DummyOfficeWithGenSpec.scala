@@ -10,16 +10,18 @@ import pl.newicom.dddd.test.support.OfficeSpec
 import pl.newicom.dddd.test.support.TestConfig._
 import DummyOfficeWithGenSpec._
 import scala.concurrent.duration.{Duration, _}
+import scalaz._
+
 
 object DummyOfficeWithGenSpec {
-  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
-    new AggregateRootActorFactory[DummyAggregateRoot] {
-      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher)
+  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyOffice] =
+    new AggregateRootActorFactory[DummyOffice] {
+      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 }
 
-class DummyOfficeWithGenSpec extends OfficeSpec[DummyAggregateRoot](Some(testSystem)) {
+class DummyOfficeWithGenSpec extends OfficeSpec[DummyOffice](Some(testSystem)) {
 
   def dummyOffice = officeUnderTest
 
@@ -49,7 +51,7 @@ class DummyOfficeWithGenSpec extends OfficeSpec[DummyAggregateRoot](Some(testSys
      */
     "create Dummy" in {
       when {
-        a [CreateDummy]
+        a[CreateDummy]
       }
       .expect { c =>
         DummyCreated(c.id, c.name, c.description, c.value)
@@ -111,7 +113,7 @@ class DummyOfficeWithGenSpec extends OfficeSpec[DummyAggregateRoot](Some(testSys
         // alternatively:
         //arbitraryOf[CreateDummy](_ copy(value = -1))
       }
-      .expectException[RuntimeException]("negative value not allowed")
+      .expectAck(-\/("negative value not allowed"))
     }
   }
 

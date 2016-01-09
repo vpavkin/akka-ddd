@@ -3,24 +3,31 @@ package pl.newicom.dddd.messaging.command
 import java.util.Date
 
 import pl.newicom.dddd.aggregate.{Command, EntityId}
-import pl.newicom.dddd.messaging.{EntityMessage, Message}
+import pl.newicom.dddd.messaging.{MetaData, EntityMessage, Message}
 import pl.newicom.dddd.utils.UUIDSupport.uuid
 
-case class CommandMessage(
+trait CommandMessage extends Message with EntityMessage {
+  def command: Command
+  override def entityId: EntityId = command.aggregateId
+  override def payload: Any = command
+  def causedBy(msg: Message): CommandMessage
+}
+
+private [command] case class CommandMessageImpl(
     command: Command,
     id: String = uuid,
-    timestamp: Date = new Date)
-  extends Message with EntityMessage {
+    timestamp: Date = new Date,
+    metadata: MetaData = MetaData.empty)
+  extends CommandMessage {
 
-  type MessageImpl = CommandMessage
+  override def deliveryId: Option[Long] = metadata.deliveryId
 
-  override def entityId: EntityId = command.aggregateId
+  override def withDeliveryId(deliveryId: Long): Message = copy(metadata = metadata.withDeliveryId(deliveryId))
 
-  override def payload: Any = command
+  override def causedBy(msg: Message): CommandMessage = copy(metadata = metadata.withCausationId(msg.id))
+}
 
-  override def toString: String = {
-    val msgClass = getClass.getSimpleName
-    s"$msgClass(command = $command, id = $id, timestamp = $timestamp, metaData = $metadata)"
-  }
-
+object CommandMessage {
+  def apply(command: Command): CommandMessage = CommandMessageImpl(command)
+  def unapply(commandMessage: CommandMessage): Option[Command] = Some(commandMessage.command)
 }

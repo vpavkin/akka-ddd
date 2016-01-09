@@ -2,7 +2,7 @@ package pl.newicom.dddd.view
 
 import pl.newicom.dddd.office.OfficeInfo
 
-abstract class ViewUpdateConfig {
+abstract class ViewUpdateConfig[O] {
   def viewName: String
-  def officeInfo: OfficeInfo[_]
+  def officeInfo: OfficeInfo[O]
 }

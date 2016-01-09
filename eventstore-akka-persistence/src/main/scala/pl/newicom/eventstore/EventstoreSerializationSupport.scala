@@ -13,6 +13,7 @@ import pl.newicom.dddd.messaging.event.{AggregateSnapshotId, DomainEventMessage,
 import pl.newicom.dddd.serialization.JsonSerHints._
 import pl.newicom.eventstore.json.JsonSerializerExtension
 
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -38,13 +39,13 @@ trait EventstoreSerializationSupport {
     x match {
       case x: PersistentRepr =>
         x.payload match {
-          case em: EventMessage =>
-            val (event, mdOpt) = toPayloadAndMetadata(em)
+          case em @ EventMessage(_, _) =>
+            val (event, md) = toPayloadAndMetadata(em)
             val eventType = classFor(event).getName
             EventData(
               eventType = eventType,
               data = toContent(x.withPayload(event), Some(eventType)),
-              metadata = mdOpt.fold(Empty)(md => toContent(md))
+              metadata = if (md.isEmpty) Empty else toContent(md)
             )
           case _ =>
             EventData(eventType = classFor(x).getName, data = toContent(x))
@@ -57,51 +58,40 @@ trait EventstoreSerializationSupport {
     }
   }
 
-  def fromEvent[A](event: EventData, manifest: Class[A]): Try[A] = {
-    val result = deserialize(event.data.value.toArray, manifest, Some(event.eventType))
-    if (manifest.isInstance(result)) {
-      Success((result match {
-        case pr: PersistentRepr =>
-          val mdOpt = event.metadata.value match {
-            case bs: ByteString if bs.isEmpty => None
-            case bs: ByteString               => Some(deserialize(bs.toArray, classOf[MetaData]))
-          }
-          pr.withPayload(fromPayloadAndMetadata(pr.payload.asInstanceOf[AnyRef], mdOpt))
-        case _ => result
-      }).asInstanceOf[A])
-    } else
-      Failure(sys.error(s"Cannot deserialize event as $manifest, event: $event"))
+  def toDomainEventMessage[E <: DomainEvent](eventData: EventData): DomainEventMessage[E] = {
+    val pr = toPersistentRepr(eventData)
+    val em = pr.payload.asInstanceOf[EventMessage[E]]
+    val aggrSnapId = new AggregateSnapshotId(pr.persistenceId, pr.sequenceNr)
+    DomainEventMessage(em, aggrSnapId).addMetadata(em.metadata)
   }
 
-  def toDomainEventMessage(eventData: EventData): Try[DomainEventMessage] =
-    fromEvent(eventData, classOf[PersistentRepr]).map { pr =>
-      val em = pr.payload.asInstanceOf[EventMessage]
-      val aggrSnapId = new AggregateSnapshotId(pr.persistenceId, pr.sequenceNr)
-      new DomainEventMessage(em, aggrSnapId).withMetaData(em.metadata).asInstanceOf[DomainEventMessage]
-    }
-
-  def toEventMessage(eventData: EventData): Try[EventMessage] = {
-    fromEvent(eventData, classOf[PersistentRepr]).map {
-      pr => pr.payload.asInstanceOf[EventMessage]
-    }
+  def toEventMessage(eventData: EventData): EventMessage[DomainEvent] = {
+    val pr = toPersistentRepr(eventData)
+    pr.payload.asInstanceOf[EventMessage[DomainEvent]]
   }
 
-  private def toPayloadAndMetadata(em: EventMessage): (DomainEvent, Option[MetaData]) =
-    (em.event, em.withMetaData(Map("id" -> em.id, "timestamp" -> em.timestamp)).metadata)
-
-  private def fromPayloadAndMetadata(payload: AnyRef, maybeMetadata: Option[MetaData]): EventMessage = {
-    if (maybeMetadata.isDefined) {
-      val metadata = maybeMetadata.get
-      val id: EntityId = metadata.get("id")
-      val timestamp = DateTime.parse(metadata.get("timestamp"))
-      new EventMessage(payload, id, timestamp).withMetaData(Some(metadata))
-    } else {
-      new EventMessage(payload)
-    }
+  def toPersistentRepr(event: EventData): PersistentRepr = {
+    val bytes = event.data.value.toArray[Byte]
+    val eventType = Some(event.eventType)
+    val repr = deserialize[PersistentRepr](bytes, eventType)
+    Some(event.metadata).collect {
+      case m if m.value.nonEmpty => deserialize[MetaData](m.value.toArray)
+    }.map { metadata =>
+      repr.withPayload(fromPayloadAndMetadata(repr.payload.asInstanceOf[DomainEvent], metadata))
+    }.getOrElse(repr)
   }
 
-  private def deserialize[T](bytes: Array[Byte], clazz: Class[T], eventType: Option[String] = None): T = {
-    jsonSerializer.fromBinary(bytes, clazz, serializationHints ++ eventType.toList)
+  private def toPayloadAndMetadata(em: EventMessage[DomainEvent]): (DomainEvent, MetaData) =
+    (em.event, em.metadata.addContent(Map("id" -> em.id, "timestamp" -> em.timestamp)))
+
+  private def fromPayloadAndMetadata(payload: DomainEvent, metadata: MetaData): EventMessage[DomainEvent] = {
+    val id: EntityId = metadata.get[EntityId]("id").get
+    val timestamp = metadata.get[String]("timestamp").map(DateTime.parse).get
+    EventMessage(payload, id, timestamp).addMetadata(metadata)
+  }
+
+  private def deserialize[A: ClassTag](bytes: Array[Byte], eventType: Option[String] = None): A = {
+    jsonSerializer.fromBinary[A](bytes, serializationHints ++ eventType.toList)
   }
 
   private def serialize(o : AnyRef, eventType: Option[String] = None): Array[Byte] =

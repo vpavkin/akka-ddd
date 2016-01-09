@@ -1,25 +1,25 @@
 package pl.newicom.dddd.test.dummy
 
 import akka.actor.Props
-import pl.newicom.dddd.actor.PassivationConfig
+import pl.newicom.dddd.actor.{BusinessEntityActorFactory, PassivationConfig}
 import pl.newicom.dddd.aggregate.AggregateRootActorFactory
 import pl.newicom.dddd.eventhandling.LocalPublisher
 import pl.newicom.dddd.test.dummy.DummyAggregateRoot._
 import pl.newicom.dddd.test.dummy.DummyOfficeSpec._
 import pl.newicom.dddd.test.support.OfficeSpec
 import pl.newicom.dddd.test.support.TestConfig.testSystem
-
+import scalaz._
 import scala.concurrent.duration.{Duration, _}
 
 object DummyOfficeSpec {
-  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
-    new AggregateRootActorFactory[DummyAggregateRoot] {
-      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher)
+  implicit def actorFactory(implicit it: Duration = 1.minute): BusinessEntityActorFactory[DummyOffice] =
+    new BusinessEntityActorFactory[DummyOffice] {
+      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 }
 
-class DummyOfficeSpec extends OfficeSpec[DummyAggregateRoot](Some(testSystem)) {
+class DummyOfficeSpec extends OfficeSpec[DummyOffice](Some(testSystem)) {
 
   def dummyOffice = officeUnderTest
 
@@ -64,7 +64,7 @@ class DummyOfficeSpec extends OfficeSpec[DummyAggregateRoot](Some(testSystem)) {
       when {
         CreateDummy(dummyId, "dummy name", "dummy description", value = -1)
       }
-      .expectException[RuntimeException]("negative value not allowed")
+      .expectAck(-\/("negative value not allowed"))
     }
 
   }

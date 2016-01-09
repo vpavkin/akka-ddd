@@ -1,5 +1,6 @@
 package pl.newicom.dddd.view.sql
 
+import pl.newicom.dddd.aggregate.DomainEvent
 import pl.newicom.dddd.messaging.event.DomainEventMessage
 import pl.newicom.dddd.view.sql.Projection.ProjectionAction
 import slick.dbio.Effect.All
@@ -9,8 +10,8 @@ object Projection {
   type ProjectionAction[E <: Effect] = DBIOAction[Unit, NoStream, E]
 }
 
-trait Projection extends DBActionHelpers {
+trait Projection[-E <: DomainEvent] extends DBActionHelpers {
 
-  def consume(event: DomainEventMessage): ProjectionAction[All]
+  def consume(event: DomainEventMessage[E]): ProjectionAction[All]
 
 }

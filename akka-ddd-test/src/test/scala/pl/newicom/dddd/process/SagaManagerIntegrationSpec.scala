@@ -2,15 +2,16 @@ package pl.newicom.dddd.process
 
 import akka.actor._
 import akka.testkit.TestProbe
-import pl.newicom.dddd.actor.PassivationConfig
+import pl.newicom.dddd.actor.{BusinessEntityActorFactory, PassivationConfig}
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.Processed
 import pl.newicom.dddd.eventhandling.LocalPublisher
 import pl.newicom.dddd.office.LocalOffice._
 import pl.newicom.dddd.process.SagaManagerIntegrationSpec._
 import pl.newicom.dddd.process.SagaSupport.{SagaManagerFactory, registerSaga}
+import pl.newicom.dddd.persistence.SaveSnapshotRequest
 import pl.newicom.dddd.test.dummy
-import pl.newicom.dddd.test.dummy.DummyAggregateRoot.{ChangeValue, CreateDummy, ValueChanged}
+import pl.newicom.dddd.test.dummy.DummyAggregateRoot._
 import pl.newicom.dddd.test.dummy.DummySaga.{DummySagaConfig, EventApplied}
 import pl.newicom.dddd.test.dummy.{DummyAggregateRoot, DummySaga}
 import pl.newicom.dddd.test.support.IntegrationTestConfig.integrationTestSystem
@@ -22,26 +23,31 @@ object SagaManagerIntegrationSpec {
 
   case object GetNumberOfUnconfirmed
 
-  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
-    new AggregateRootActorFactory[DummyAggregateRoot] {
-      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher)
+  implicit def actorFactory(implicit it: Duration = 1.minute): BusinessEntityActorFactory[DummyOffice] =
+    new BusinessEntityActorFactory[DummyOffice] {
+      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 
+
+  implicit def actorSystem = integrationTestSystem("SagaManagerIntegrationSpec")
 }
 
 /**
  * Requires EventStore to be running on localhost!
  */
-class SagaManagerIntegrationSpec extends OfficeSpec[DummyAggregateRoot](Some(integrationTestSystem("SagaManagerIntegrationSpec"))) {
+
+
+
+class SagaManagerIntegrationSpec extends OfficeSpec[DummyOffice](Some(integrationTestSystem("SagaManagerIntegrationSpec"))) {
 
   override val shareAggregateRoot = true
 
   def dummyId = aggregateId
 
-  implicit lazy val testSagaConfig = new DummySagaConfig(s"${dummy.dummyOffice.name}-$dummyId")
+  implicit lazy val testSagaConfig = new DummySagaConfig(s"${DummyAggregateRoot.DummyOffice.info.name}-$dummyId")
 
-  implicit val sagaManagerFactory: SagaManagerFactory = (sagaConfig, sagaOffice) => {
+  implicit def sagaManagerFactory[S <: Saga[_, _]]: SagaManagerFactory[S] = (sagaConfig, sagaOffice) => {
     new SagaManager(sagaConfig, sagaOffice) with EventstoreSubscriber {
       override def redeliverInterval = 1.seconds
       override def receiveCommand: Receive = myReceive.orElse(super.receiveCommand)
@@ -142,7 +148,7 @@ class SagaManagerIntegrationSpec extends OfficeSpec[DummyAggregateRoot](Some(int
   }
 
   def expectNumberOfUnconfirmedMessages(sagaManager: ActorRef, expectedNumberOfMessages: Int): Unit = within(3.seconds) {
-    sagaManager ! "snap"
+    sagaManager ! SaveSnapshotRequest
     awaitAssert {
       sagaManager ! GetNumberOfUnconfirmed
       expectMsg(expectedNumberOfMessages)

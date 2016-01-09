@@ -4,6 +4,8 @@ package object aggregate {
 
   type EntityId = String
 
-  type DomainEvent = AnyRef
+  trait DomainEvent {
+    def aggregateId: EntityId
+  }
 
 }

@@ -3,12 +3,12 @@ import sbt._
 object Deps {
 
   object Version {
-    val Akka                  = "2.4.0"
-    val AkkaHttp              = "1.0"
-    
-    val EventStoreClient      = "2.1.1"
-    val EventStoreAkkaJournal = "2.1.0"
-    
+    val Akka                  = "2.4.2-SNAPSHOT"
+    val AkkaHttp              = "2.0.1"
+
+    val EventStoreClient      = "2.1.3-SNAPSHOT"
+    val EventStoreAkkaJournal = "2.1.1-SNAPSHOT"
+
     val json4s                = "3.3.0"
 
     val Slick                 = "3.1.0"
@@ -20,7 +20,11 @@ object Deps {
     val ScalaCheck            = "1.12.5"
 
     val LogbackClassic        = "1.1.3"
-    val nScalaTime            = "2.2.0"
+    val nScalaTime            = "2.6.0"
+
+    val scalaz                = "7.1.4"
+
+    val shapeless              = "2.2.5"
   }
 
   object Akka {
@@ -32,6 +36,7 @@ object Deps {
     val persistence       = apply("persistence")
     val clusterTools      = apply("cluster-tools")
     val clusterSharding   = apply("cluster-sharding")
+    val contributions     = apply("contrib")
     val testkit           = apply("testkit")
     val multiNodeTestkit  = apply("multi-node-testkit")
 
@@ -53,6 +58,12 @@ object Deps {
     val client        = "com.geteventstore" %% "eventstore-client" % Version.EventStoreClient
     val akkaJournal   = "com.geteventstore" %% "akka-persistence-eventstore" % Version.EventStoreAkkaJournal
   }
+
+  object Scalaz {
+    val core          = "org.scalaz" %% "scalaz-core" % Version.scalaz
+  }
+
+  val Shapeless = "com.chuusai" %% "shapeless" % Version.shapeless
 
   object SqlDb {
     val `slick-for-pg` = "com.github.tminglei" %% "slick-pg" % Version.PostgresqlSlickExt exclude("org.slf4j", "slf4j-simple")

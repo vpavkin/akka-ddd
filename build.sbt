@@ -5,7 +5,7 @@ import java.net.URL
 
 name := "akka-ddd"
 
-version in ThisBuild := "1.0.8-SNAPSHOT"
+version in ThisBuild := "1.0.10-SNAPSHOT"
 organization in ThisBuild := "pl.newicom.dddd"
 scalaVersion in ThisBuild := "2.11.7"
 
@@ -26,7 +26,7 @@ lazy val `akka-ddd-messaging` = project
   .settings(
     commonSettings,
     scalacOptions ++= Seq("-language:implicitConversions"),
-    libraryDependencies ++= Json.`4s` ++ Seq(Akka.actor, nscalaTime)
+    libraryDependencies ++= Json.`4s` ++ Seq(Akka.actor, nscalaTime, Akka.contributions, Shapeless)
   )
 
 
@@ -36,7 +36,7 @@ lazy val `akka-ddd-core` = project
     scalacOptions ++= Seq("-language:implicitConversions"),
     publishArtifact in Test := true,
     libraryDependencies ++= Seq(
-      Akka.clusterTools, Akka.clusterSharding, Akka.persistence, Akka.slf4j
+      Akka.clusterTools, Akka.clusterSharding, Akka.persistence, Akka.contributions, Akka.slf4j, Scalaz.core, Shapeless
     ))
   .dependsOn(`akka-ddd-messaging`)
 

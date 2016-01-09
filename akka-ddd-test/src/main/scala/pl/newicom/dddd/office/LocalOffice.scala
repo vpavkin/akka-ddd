@@ -3,6 +3,7 @@ package pl.newicom.dddd.office
 import akka.actor._
 import pl.newicom.dddd.actor.{ActorContextCreationSupport, BusinessEntityActorFactory, Passivate, PassivationConfig}
 import pl.newicom.dddd.aggregate.{BusinessEntity, Command}
+import pl.newicom.dddd.cluster.ShardResolution
 import pl.newicom.dddd.messaging.EntityMessage
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.correlation.EntityIdResolution
@@ -13,19 +14,18 @@ import scala.reflect.ClassTag
 
 object LocalOffice {
 
-  implicit def localOfficeFactory[A <: BusinessEntity: BusinessEntityActorFactory: EntityIdResolution : ClassTag](implicit system: ActorSystem): OfficeFactory[A] = {
+  implicit def localOfficeFactory[A : EntityIdResolution : ClassTag](implicit system: ActorSystem): OfficeFactory[A] = {
     new OfficeFactory[A] {
-      override def getOrCreate: ActorRef = {
-        system.actorOf(Props(new LocalOffice[A]()), s"${officeName}_${uuid7}")
+      override def getOrCreate(name: String, entityFactory: BusinessEntityActorFactory[A], entityIdResolution: EntityIdResolution[A]): ActorRef = {
+        system.actorOf(Props(new LocalOffice[A](entityFactory)), s"${name}_${uuid7}")
       }
     }
   }
 }
 
-class LocalOffice[A <: BusinessEntity](inactivityTimeout: Duration = 1.minutes)(
+class LocalOffice[A](clerkFactory: BusinessEntityActorFactory[A], inactivityTimeout: Duration = 1.minutes)(
   implicit ct: ClassTag[A],
-  caseIdResolution: EntityIdResolution[A],
-  clerkFactory: BusinessEntityActorFactory[A])
+  caseIdResolution: EntityIdResolution[A])
   extends ActorContextCreationSupport with Actor with ActorLogging {
 
   override def aroundReceive(receive: Actor.Receive, msg: Any): Unit = {

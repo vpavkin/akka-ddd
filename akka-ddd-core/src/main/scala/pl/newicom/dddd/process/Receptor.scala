@@ -1,15 +1,19 @@
 package pl.newicom.dddd.process
 
 import akka.actor.ActorPath
-import pl.newicom.dddd.aggregate.EntityId
-import pl.newicom.dddd.delivery.AtLeastOnceDeliverySupport
+import akka.contrib.pattern.ReceivePipeline
+import akka.persistence.PersistentActor
+import pl.newicom.dddd.aggregate.{DomainEvent, EntityId}
+import pl.newicom.dddd.delivery.{DeliveryState, AtLeastOnceDeliverySupport}
+import pl.newicom.dddd.messaging.event.EventStreamSubscriber.{InFlightMessagesCallback, EventReceived}
 import pl.newicom.dddd.messaging.event._
 import pl.newicom.dddd.messaging.{Message, MetaData}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.process.ReceptorConfig.{ReceiverResolver, StimuliSource, Transduction}
+import pl.newicom.dddd.persistence.{RegularSnapshottingConfig, RegularSnapshotting}
 
 object ReceptorConfig {
-  type Transduction = PartialFunction[EventMessage, Message]
+  type Transduction = PartialFunction[EventMessage[DomainEvent], Message]
   type ReceiverResolver = PartialFunction[Message, ActorPath]
   type StimuliSource = EventStream
 }
@@ -31,7 +35,7 @@ case class ReceptorBuilder(
     stimuliSource: StimuliSource = null,
     transduction: Transduction = {case em => em},
     receiverResolver: ReceiverResolver = null)
-  extends ReceptorGrammar {
+  extends ReceptorGrammar { self =>
 
   def reactTo[A : OfficeInfo]: ReceptorBuilder = {
     reactTo[A](None)
@@ -51,20 +55,27 @@ case class ReceptorBuilder(
   def applyTransduction(transduction: Transduction) =
     copy(transduction = transduction)
 
-  def route(_receiverResolver: ReceiverResolver) =
+  def route(_receiverResolver: ReceiverResolver): ReceptorConfig =
     new ReceptorConfig() {
-      def stimuliSource = ReceptorBuilder.this.stimuliSource
-      def transduction = ReceptorBuilder.this.transduction
+      def stimuliSource = self.stimuliSource
+      def transduction = self.transduction
       def receiverResolver = _receiverResolver
     }
 
-  def propagateTo(_receiver: ActorPath) = route({case _ => _receiver})
+  def propagateTo(_receiver: ActorPath): ReceptorConfig = route({case _ => _receiver})
 }
 
-abstract class Receptor extends AtLeastOnceDeliverySupport {
+trait ReceptorPersistencePolicy extends ReceivePipeline with RegularSnapshotting {
+  this: PersistentActor =>
+  override def journalPluginId = "akka.persistence.journal.inmem"
+}
+
+abstract class Receptor extends AtLeastOnceDeliverySupport with ReceptorPersistencePolicy {
   this: EventStreamSubscriber =>
 
   def config: ReceptorConfig
+
+  val snapshottingConfig = RegularSnapshottingConfig(receiveEvent, 1000)
 
   def deadLetters = context.system.deadLetters.path
 
@@ -72,20 +83,27 @@ abstract class Receptor extends AtLeastOnceDeliverySupport {
 
   override lazy val persistenceId: String = s"Receptor-${config.stimuliSource.officeName}-${self.path.hashCode}"
 
+  var inFlightCallback: Option[InFlightMessagesCallback] = None
+
   override def recoveryCompleted(): Unit =
-    subscribe(config.stimuliSource, lastSentDeliveryId)
+    inFlightCallback = Some(subscribe(config.stimuliSource, lastSentDeliveryId))
 
   override def receiveCommand: Receive =
-    receiveEvent(metaDataProvider).orElse(deliveryStateReceive).orElse {
+    receiveEvent.orElse(deliveryStateReceive).orElse {
       case other =>
         log.warning(s"RECEIVED: $other")
     }
 
-  override def eventReceived(em: EventMessage, position: Long): Unit =
-    config.transduction.lift(em).foreach { msg =>
-      deliver(msg, deliveryId = position)
-    }
+  def metaDataProvider(em: EventMessage[DomainEvent]): Option[MetaData] = None
 
-  def metaDataProvider(em: EventMessage): Option[MetaData] = None
+  def receiveEvent: Receive = {
+    case EventReceived(em, position) =>
+      config.transduction.lift(em).foreach { msg =>
+        deliver(msg, deliveryId = position)
+      }
+  }
+
+  override def deliveryStateUpdated(deliveryState: DeliveryState): Unit =
+    inFlightCallback.foreach(_.onChanged(deliveryState.unconfirmedNumber))
 
 }

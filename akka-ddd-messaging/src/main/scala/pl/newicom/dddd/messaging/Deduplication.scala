@@ -1,23 +1,30 @@
 package pl.newicom.dddd.messaging
 
-import akka.actor.Actor.Receive
+import akka.contrib.pattern.ReceivePipeline
+import akka.contrib.pattern.ReceivePipeline.{Inner, HandledCompletely}
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
-trait Deduplication {
+trait Deduplication[M <: Message, R] {
+  this: ReceivePipeline =>
+  implicit def M: ClassTag[M]
 
-  private val processedMessages: mutable.Set[String] = mutable.Set.empty
+  private val processedMessages: mutable.Map[String, R] = mutable.Map.empty
 
-  def receiveDuplicate(handleDuplicate: Message => Unit): Receive = {
-    case m: Message if wasProcessed(m) =>
-      handleDuplicate(m)
+  pipelineInner {
+    case m: M =>
+      processedMessages.get(m.id).map { result =>
+        handleDuplicated(m, result)
+        HandledCompletely
+      }.getOrElse {
+        Inner(m)
+      }
   }
 
-  def messageProcessed(m: Message): Unit = {
-    processedMessages += m.id
+  def handleDuplicated(m: M, result: R)
+
+  def messageProcessed(messageId: String, result: R): Unit = {
+    processedMessages += (messageId -> result)
   }
-
-  def wasProcessed(m: Message): Boolean =
-    processedMessages.contains(m.id)
-
 }

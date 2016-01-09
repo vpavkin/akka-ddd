@@ -13,29 +13,29 @@ import scala.concurrent.duration._
 object SchedulerSpec {
   val businessUnit = "test"
 
-  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[Scheduler] =
-    new AggregateRootActorFactory[Scheduler] {
-      override def props(pc: PassivationConfig): Props = Props(new Scheduler(pc, businessUnit) with LocalPublisher)
+  implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[SchedulingOffice] =
+    new AggregateRootActorFactory[SchedulingOffice] {
+      override def props(pc: PassivationConfig): Props = Props(new SchedulerActor(pc) with LocalPublisher[CommandScheduled])
       override def inactivityTimeout: Duration = it
     }
 
 }
 
-class SchedulerSpec extends OfficeSpec[Scheduler](Some(testSystem)) {
+class SchedulerSpec extends OfficeSpec[SchedulingOffice](Some(testSystem)) {
 
   "Scheduling office" should {
     "schedule event" in {
       when {
-        ScheduleEvent(businessUnit, null, DateTime.now().plusMinutes(1), null)
+        ScheduleCommand(businessUnit, null, DateTime.now().plusMinutes(1), null)
       }
         .expect { c =>
-          EventScheduled(
-            ScheduledEventMetadata(
+          CommandScheduled(
+            ScheduledCommandMetadata(
               c.businessUnit,
               c.target,
               c.deadline.withSecondOfMinute(0).withMillisOfSecond(0),
               c.deadline.getMillis),
-            c.event)
+            c.command)
         }
     }
   }

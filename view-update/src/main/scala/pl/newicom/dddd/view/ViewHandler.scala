@@ -1,12 +1,13 @@
 package pl.newicom.dddd.view
 
+import pl.newicom.dddd.aggregate.DomainEvent
 import pl.newicom.dddd.messaging.event.DomainEventMessage
 
 import scala.concurrent.Future
 
-abstract class ViewHandler(val vuConfig: ViewUpdateConfig) {
+abstract class ViewHandler[-E <: DomainEvent, O](val vuConfig: ViewUpdateConfig[O]) {
 
-  def handle(eventMessage: DomainEventMessage, eventNumber: Long): Future[Unit]
+  def handle(eventMessage: DomainEventMessage[E], eventNumber: Long): Future[Unit]
 
   def lastEventNumber: Future[Option[Long]]
 

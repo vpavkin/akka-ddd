@@ -19,15 +19,15 @@ import slick.dbio._
 import slick.dbio.DBIOAction.{failed, successful}
 import slick.dbio.Effect.All
 import slick.util.DumpInfo
-
+import DummyAggregateRoot._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 object SqlViewUpdateServiceIntegrationSpec {
 
-  implicit def dummyFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyAggregateRoot] =
-    new AggregateRootActorFactory[DummyAggregateRoot] {
-      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher)
+  implicit def dummyFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyOffice] =
+    new AggregateRootActorFactory[DummyOffice] {
+      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 
@@ -45,7 +45,7 @@ object SqlViewUpdateServiceIntegrationSpec {
  * Requires Event Store (with projections enabled!) to be up and running.
  */
 class SqlViewUpdateServiceIntegrationSpec
-  extends OfficeSpec[DummyAggregateRoot](Some(integrationTestSystem("SqlViewUpdateServiceIntegrationSpec")))
+  extends OfficeSpec[DummyOffice](Some(integrationTestSystem("SqlViewUpdateServiceIntegrationSpec")))
   with SqlViewStoreTestSupport {
 
   "SqlViewUpdateService" should {
@@ -58,12 +58,12 @@ class SqlViewUpdateServiceIntegrationSpec
       system.actorOf(Props(
         new SqlViewUpdateService with SqlViewStoreConfiguration {
           def config = SqlViewUpdateServiceIntegrationSpec.this.config
-          def vuConfigs = List(SqlViewUpdateConfig("test-view", dummyOffice, new Projection {
+          def vuConfigs = List(SqlViewUpdateConfig("test-view", DummyAggregateRoot.DummyOffice.info, new Projection[pl.newicom.dddd.aggregate.DomainEvent] {
 
             def failIfRequired(msg: String) =
               if (shouldFail) failed(new RuntimeException(msg)) else successful(())
 
-            def consume(em: DomainEventMessage): ProjectionAction[All] = {
+            def consume(em: DomainEventMessage[pl.newicom.dddd.aggregate.DomainEvent]): ProjectionAction[All] = {
               val event = em.event.asInstanceOf[DummyEvent]
               val ignore = !aggregateId.equals(event.id)
               if (ignore)

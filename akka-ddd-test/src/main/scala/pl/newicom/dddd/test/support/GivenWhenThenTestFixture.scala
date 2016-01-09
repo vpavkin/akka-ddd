@@ -51,7 +51,7 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
 
   case class PastEvents(list: List[Processed] = List.empty) {
     private val map: Map[Class[_], List[Any]] =
-      list.groupBy(_.result.get.getClass).mapValues(ackSeq => ackSeq.map(_.result.get))
+      list.groupBy(_.result.getClass).mapValues(ackSeq => ackSeq.map(_.result))
 
     def first[E](implicit ct: ClassTag[E]): E = map.get(ct.runtimeClass).map(_.head).orNull.asInstanceOf[E]
     def last[E](implicit ct: ClassTag[E]): E = map.get(ct.runtimeClass).map(_.last).orNull.asInstanceOf[E]
@@ -71,7 +71,7 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
 
     def when[C <: Command](wc: WhenContext[C]): When[C] = when(wc, () => {
       val command: C = wc.command
-      val cm = CommandMessage(command).withMetaData(commandMetaDataProvider(command))
+      val cm = CommandMessage(command)
       officeUnderTest ! cm
     })
 
@@ -98,6 +98,13 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
 
     def expect2[E](f: (C, Any) => E)(implicit t: ClassTag[E]): Unit = {
       expectEvent(f(wc.command, wc.params.head))
+    }
+
+    def expectAck[E](ack: E): Unit = {
+      whenFun()
+      expectMsgPF[Boolean](timeoutThen.duration) {
+        case Processed(scala.util.Success(`ack`)) => true
+      }
     }
 
     def expectException[E <: Exception](message: String = null)(implicit t: ClassTag[E]): Unit = {
@@ -128,7 +135,7 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
     Given(
       givenFun = () => {
         cs.map { c =>
-          val cm = CommandMessage(c).withMetaData(commandMetaDataProvider(c))
+          val cm = CommandMessage(c)
           Await.result((officeUnderTest ? cm).mapTo[Processed], timeout.duration)
         }
       }
@@ -146,6 +153,4 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
 
   def first[E](implicit wc: WhenContext[_], ct: ClassTag[E]): E =
     wc.pastEvents.first[E]
-
-  def commandMetaDataProvider(c: Command): Option[MetaData] = None
 }

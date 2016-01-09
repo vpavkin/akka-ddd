@@ -24,7 +24,7 @@ class EventStoreSerializer(override val system: ExtendedActorSystem)
     throw new UnsupportedOperationException(errorMsg)
 
   override def fromEvent(event: Event, manifest: Class[_]): AnyRef =
-    fromEvent(event.data, manifest.asInstanceOf[Class[AnyRef]]).get
+    toPersistentRepr(event.data)
 
   override def toEvent(o: AnyRef): EventData =
     toEventData(o, ContentType.Json)

@@ -11,5 +11,5 @@ import scala.util.{Success, Try}
 trait Delivered extends Receipt {
   def deliveryId: Long
 }
-case class Received(deliveryId: Long)                                    extends Delivered
-case class Processed(deliveryId: Long, result: Try[Any] = Success("OK")) extends Delivered
+case class Received(deliveryId: Long)                      extends Delivered
+case class Processed(deliveryId: Long, result: Any = "OK") extends Delivered
