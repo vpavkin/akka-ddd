@@ -31,6 +31,7 @@ case class MetaData(content: Map[String, Any]) extends Serializable {
   def withDeliveryId(deliveryId: Long): MetaData = copy(content = content + (DeliveryId -> deliveryId))
   def deliveryId: Option[Long] = get[Long](DeliveryId)
   def withCausationId(causationId: EntityId): MetaData = copy(content = content + (CausationId -> causationId))
+  def causationId: Option[String] = get[String](CausationId)
 }
 
 

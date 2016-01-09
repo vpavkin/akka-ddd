@@ -97,7 +97,7 @@ object Saga {
 
 class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, receiveEvent: In => Option[State] => EventDecision, react: In => Option[State] => EventReaction[State])(implicit In: InjectAny[In], sct: ClassTag[State])
   extends GracefulPassivation with PersistentActor with ReceivePipeline
-    with Deduplication with AtLeastOnceDelivery with ActorLogging {
+    with Deduplication[Message, Unit] with AtLeastOnceDelivery with ActorLogging {
 
   override def persistenceId: String = name + "-" + id
 
@@ -145,18 +145,18 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
     }
 
 
-  def applyReceipt: PartialFunction[Delivered, Unit] = PartialFunction.empty
+  def applyReceipt: PartialFunction[Delivered, Unit] = {
+    case Processed(_, In(in)) => react(in)(state) <| runReaction
+  }
 
   private def updateStateWithEvent(em: EventMessage[DomainEvent]) = {
     messageProcessed(em)
-    applyEvent(em)
+    applyEvent(em.event)
   }
 
-  def applyEvent(em: EventMessage[DomainEvent]) = {
-    em.event match {
-      case In(in) => react(in)(state) <| runReaction
-      case _ => ()
-    }
+  def applyEvent: DomainEvent => Unit = {
+    case In(in) => react(in)(state) <| runReaction
+    case _ => ()
   }
 
   def runReaction: EventReaction[State] => Unit = {
@@ -173,7 +173,7 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
   }
 
   private def acknowledgeMessage(message: Message) {
-    val deliveryReceipt = message.deliveryReceipt()
+    val deliveryReceipt = message.deliveryReceipt(())
     sender() ! deliveryReceipt
     log.debug(s"Message [{}] delivery receipt [{}] sent", message, deliveryReceipt)
   }
@@ -185,6 +185,12 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
   def handleUnexpectedEvent(em: EventMessage[DomainEvent]): Unit = {
     log.warning("Unhandled event message: [{}]", em)
   }
+
+
+
+  override implicit def M: ClassManifest[Message] = ???
+
+  override def handleDuplicated(m: Message, result: Unit): Unit = acknowledgeMessage(m)
 
   override def messageProcessed(m: Message): Unit = {
     _lastEventMessage = Some(m).collect {

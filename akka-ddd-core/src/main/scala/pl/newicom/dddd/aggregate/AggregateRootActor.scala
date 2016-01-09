@@ -66,9 +66,8 @@ object AggregateRootActorFactory {
 
 abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
 (val pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])
-(implicit officeInfo: OfficeInfo[O], contract: OfficeContract.Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], cm: ClassTag[Cm])
-  extends GracefulPassivation with PersistentActor with Stash
-  with EventHandler[Ev] with ReceivePipeline with Deduplication with ActorLogging {
+(implicit officeInfo: OfficeInfo[O], contract: OfficeContract.Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], val M: ClassTag[Cm])
+  extends GracefulPassivation with PersistentActor with Stash with ReceivePipeline with Deduplication[CommandMessage, Ev] with ActorLogging {
 
   import AggregateReaction._
   implicit def ec: ExecutionContext = context.system.dispatcher
@@ -76,7 +75,6 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
   private case class CollaborationResult(reaction: AggregateReaction[Ev, Er])
 
   private var stateOpt: Option[S] = None
-  private var lastCommandMessage: Option[CommandMessage] = None
 
   override def persistenceId: String = officeInfo.clerkGlobalId(id)
   def id = self.path.name
@@ -88,27 +86,21 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
   override def receiveCommand: Receive = {
     case commandMessage: CommandMessage =>
       log.debug(s"Received: $commandMessage")
-      lastCommandMessage = Some(commandMessage)
-      commandMessage.command match {
-        case command: Cm => handleCommand(commandMessage)(command)
-        case other => unhandled(other)
-      }
+      handleCommand(commandMessage)
   }
 
-  def handleCommand(commandMessage: CommandMessage): Cm => Unit = { command =>
-    val reactionOpt = stateOpt match {
-      case Some(state) => Some(behavior.processCommand(state)(command))
-      case None => behavior.processFirstCommand.lift(command)
-    }
-    reactionOpt match {
-      case Some(reaction) => handleReaction(commandMessage)(reaction)
-      case None => unhandled(command)
-    }
+  def handleCommand: CommandMessage => Unit = {
+    case cm @ CommandMessage(command: Cm) =>
+      stateOpt.map(state => behavior.processCommand(state)(command))
+        .orElse(behavior.processFirstCommand.lift(command))
+        .map(handleReaction(cm))
+        .getOrElse(unhandled(command))
+    case other => unhandled(other.command)
   }
 
   def handleReaction(commandMessage: CommandMessage): AggregateReaction[Ev, Er] => Unit = {
-    case Accept(evt) => raise(commandMessage)(evt)
-    case Reject(err) => acknowledgeCommand(commandMessage)(err.left[Ev])
+    case Accept(evt) => accept(commandMessage)(evt)
+    case Reject(err) => reject(commandMessage)(err)
     case Collaborate(f) =>
       context.become(awaitingCollaborationResult(commandMessage), discardOld = false)
       f(ec).map(CollaborationResult).pipeTo(self)
@@ -124,36 +116,36 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
     case _ => stash()
   }
 
-  private def raise(causedBy: CommandMessage)(event: Ev) {
-    persist(EventMessage(event).causedBy(causedBy)) { persisted =>
+  private def accept(command: CommandMessage)(event: Ev) {
+    persist(EventMessage(event).causedBy(command)) { persisted =>
       log.info("Event persisted: {}", event)
       updateState(persisted)
-      handle(sender(), toDomainEventMessage(persisted))
+      acknowledgeCommand(command)(persisted.event.right)
     }
+  }
+
+  private def reject(causedBy: CommandMessage)(err: Er): Unit = {
+    acknowledgeCommand(causedBy)(err.left[Ev])
   }
 
   def updateState(persisted: EventMessage[Ev]) {
     val event = persisted.event
     val nextState = stateOpt.map(state => behavior.applyEvent(state)(event)).getOrElse(behavior.applyFirstEvent(event))
     stateOpt = Option(nextState)
-    messageProcessed(persisted)
+    messageProcessed(persisted.metadata.causationId.get, event)
   }
 
   def toDomainEventMessage(persisted: EventMessage[Ev]): DomainEventMessage[Ev] =
     DomainEventMessage(persisted, AggregateSnapshotId(id, lastSequenceNr))
 
-  override def handle(senderRef: ActorRef, eventMessage: DomainEventMessage[Ev]) {
-    lastCommandMessage.foreach(acknowledgeCommandProcessed(Success(eventMessage.event.right[Er])))
-  }
-
-  def acknowledgeCommand(commandMessage: CommandMessage)(result: Er \/ Ev) =
-    acknowledgeCommandProcessed(Success(result))(commandMessage)
-
-  def acknowledgeCommandProcessed(result: Any = "Ok")(msg: Message) {
-    val deliveryReceipt = msg.deliveryReceipt(result)
+  def acknowledgeCommand(commandMessage: CommandMessage)(result: Er \/ Ev) = {
+    val deliveryReceipt = commandMessage.deliveryReceipt(result)
     sender() ! deliveryReceipt
     log.debug(s"Delivery receipt (for received command) sent ($deliveryReceipt)")
   }
 
-  def handleDuplicated(msg: Message) = acknowledgeCommandProcessed()(msg)
+
+  override def handleDuplicated(m: CommandMessage, result: Ev): Unit = m match {
+    case cm @ CommandMessage(command: Cm) => acknowledgeCommand(cm)(result.right[Er])
+  }
 }

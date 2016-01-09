@@ -29,4 +29,5 @@ private [command] case class CommandMessageImpl(
 
 object CommandMessage {
   def apply(command: Command): CommandMessage = CommandMessageImpl(command)
+  def unapply(commandMessage: CommandMessage): Option[Command] = Some(commandMessage.command)
 }

@@ -4,29 +4,27 @@ import akka.contrib.pattern.ReceivePipeline
 import akka.contrib.pattern.ReceivePipeline.{Inner, HandledCompletely}
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
-trait Deduplication {
+trait Deduplication[M <: Message, R] {
   this: ReceivePipeline =>
+  implicit def M: ClassTag[M]
 
-  private val processedMessages: mutable.Set[String] = mutable.Set.empty
+  private val processedMessages: mutable.Map[String, R] = mutable.Map.empty
 
   pipelineInner {
-    case m: Message =>
-      if (wasProcessed(m)) {
-        handleDuplicated(m)
+    case m: M =>
+      processedMessages.get(m.id).map { result =>
+        handleDuplicated(m, result)
         HandledCompletely
-      } else {
+      }.getOrElse {
         Inner(m)
       }
   }
 
-  def handleDuplicated(m: Message)
+  def handleDuplicated(m: M, result: R)
 
-  def messageProcessed(m: Message): Unit = {
-    processedMessages += m.id
+  def messageProcessed(messageId: String, result: R): Unit = {
+    processedMessages += (messageId -> result)
   }
-
-  def wasProcessed(m: Message): Boolean =
-    processedMessages.contains(m.id)
-
 }
