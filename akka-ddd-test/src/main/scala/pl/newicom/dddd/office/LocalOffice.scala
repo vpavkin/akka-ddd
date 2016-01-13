@@ -2,11 +2,8 @@ package pl.newicom.dddd.office
 
 import akka.actor._
 import pl.newicom.dddd.actor.{ActorContextCreationSupport, BusinessEntityActorFactory, Passivate, PassivationConfig}
-import pl.newicom.dddd.aggregate.{BusinessEntity, Command}
-import pl.newicom.dddd.cluster.ShardResolution
 import pl.newicom.dddd.messaging.EntityMessage
-import pl.newicom.dddd.messaging.command.CommandMessage
-import pl.newicom.dddd.messaging.correlation.EntityIdResolution
+import pl.newicom.dddd.messaging.correlation.EntityIdResolver
 import pl.newicom.dddd.utils.UUIDSupport.uuid7
 
 import scala.concurrent.duration._
@@ -14,40 +11,37 @@ import scala.reflect.ClassTag
 
 object LocalOffice {
 
-  implicit def localOfficeFactory[A : EntityIdResolution : ClassTag](implicit system: ActorSystem): OfficeFactory[A] = {
+  implicit def localOfficeFactory[A : EntityIdResolver : ClassTag](implicit system: ActorSystem): OfficeFactory[A] = {
     new OfficeFactory[A] {
-      override def getOrCreate(name: String, entityFactory: BusinessEntityActorFactory[A], entityIdResolution: EntityIdResolution[A]): ActorRef = {
-        system.actorOf(Props(new LocalOffice[A](entityFactory)), s"${name}_${uuid7}")
+      override def getOrCreate(name: String, entityFactory: BusinessEntityActorFactory[A], entityIdResolver: EntityIdResolver[A]): ActorRef = {
+        system.actorOf(Props(new LocalOffice[A](entityFactory, entityIdResolver)), s"${name}_${uuid7}")
       }
     }
   }
 }
 
-class LocalOffice[A](clerkFactory: BusinessEntityActorFactory[A], inactivityTimeout: Duration = 1.minutes)(
-  implicit ct: ClassTag[A],
-  caseIdResolution: EntityIdResolution[A])
+class LocalOffice[A : ClassTag](clerkFactory: BusinessEntityActorFactory[A], entityIdResolver: EntityIdResolver[A], inactivityTimeout: Duration = 1.minutes)
   extends ActorContextCreationSupport with Actor with ActorLogging {
 
   override def aroundReceive(receive: Actor.Receive, msg: Any): Unit = {
-    receive.applyOrElse(msg match {
-      case c: Command => CommandMessage(c)
-      case other => other
-    }, unhandled)
+    val message = entityIdResolver.resolveEntityId.lift(msg).map(_._2)
+    message match {
+      case Some(in) => receive.applyOrElse(in, unhandled)
+      case None => unhandled(msg)
+    }
   }
 
   def receive: Receive = {
-    // TODO (passivation) in-between receiving Passivate and Terminated the office should buffer all incoming messages
-    // for the clerk being passivated, when receiving Terminated it should flush the buffer
     case Passivate(stopMessage) =>
       dismiss(sender(), stopMessage)
     case msg: EntityMessage =>
       val clerkProps = clerkFactory.props(PassivationConfig(Passivate(PoisonPill), clerkFactory.inactivityTimeout))
-      val clerk = assignClerk(clerkProps, resolveCaseId(msg))
+      val clerk = assignClerk(clerkProps, resolveEntityId(msg))
       log.debug(s"Forwarding EntityMessage to ${clerk.path}")
       clerk forward msg
   }
 
-  def resolveCaseId(msg: Any) = caseIdResolution.entityIdResolver(msg)
+  def resolveEntityId(msg: Any) = entityIdResolver.resolveEntityId.andThen(_._1)(msg)
 
   def assignClerk(caseProps: Props, caseId: String): ActorRef = getOrCreateChild(caseProps, caseId)
 

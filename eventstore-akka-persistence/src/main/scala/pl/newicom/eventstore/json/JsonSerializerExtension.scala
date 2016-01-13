@@ -1,6 +1,7 @@
 package pl.newicom.eventstore.json
 
 import java.nio.charset.Charset
+
 import akka.actor._
 import akka.persistence.eventstore.snapshot.EventStoreSnapshotStore.SnapshotEvent.Snapshot
 import akka.persistence.{PersistentRepr, SnapshotMetadata}
@@ -10,13 +11,12 @@ import org.json4s.JsonAST.{JField, JObject, JString}
 import org.json4s.native.Serialization.{read, write}
 import org.json4s.reflect.TypeInfo
 import org.json4s.{Formats, FullTypeHints, _}
-import pl.newicom.dddd.aggregate.{Command, DomainEvent}
-import pl.newicom.dddd.delivery.protocol.{Received, Processed}
-import pl.newicom.dddd.delivery.protocol.alod.{Processed => AlodProcessed, Received => AlodReceived}
+import pl.newicom.dddd.aggregate.Command
+import pl.newicom.dddd.delivery.protocol.{Delivered, Processed}
 import pl.newicom.dddd.messaging.MetaData
-import pl.newicom.dddd.scheduling.{ScheduledCommandMetadata, CommandScheduled}
-import pl.newicom.dddd.serialization.{JsonSerHints, JsonExtraSerHints}
+import pl.newicom.dddd.scheduling.{CommandScheduled, ScheduledCommandMetadata}
 import pl.newicom.dddd.serialization.JsonSerHints._
+import pl.newicom.dddd.serialization.{JsonExtraSerHints, JsonSerHints}
 
 import scala.reflect.ClassTag
 
@@ -32,7 +32,7 @@ class JsonSerializerExtensionImpl(system: ExtendedActorSystem) extends Extension
   val extraHints = JsonExtraSerHints(
     typeHints =
       new FullTypeHints(
-        List(classOf[MetaData], classOf[Processed], Received.getClass, classOf[AlodProcessed], classOf[AlodReceived], classOf[PersistentRepr], classOf[CommandScheduled])
+        List(classOf[MetaData], classOf[Processed], classOf[Delivered], classOf[PersistentRepr], classOf[CommandScheduled])
       ),
     serializers =
       List(ActorRefSerializer, ActorPathSerializer, new ScheduledEventSerializer, new SnapshotJsonSerializer(system))

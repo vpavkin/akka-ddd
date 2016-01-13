@@ -7,7 +7,7 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, WordSpecLike}
 import org.slf4j.LoggerFactory.getLogger
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, CreationSupport}
 import pl.newicom.dddd.aggregate.{DomainEvent, AggregateRootBehavior, Command, EntityId}
-import pl.newicom.dddd.messaging.correlation.{EntityIdResolution, AggregateIdResolution}
+import pl.newicom.dddd.messaging.correlation.{EntityIdResolver$, AggregateIdResolver}
 import pl.newicom.dddd.office.Office._
 import pl.newicom.dddd.office.{OfficeFactory, OfficeContract, OfficeInfo}
 import pl.newicom.dddd.test.support.GivenWhenThenTestFixture
@@ -87,7 +87,7 @@ abstract class BehaviorSpec[A : BusinessEntityActorFactory : OfficeInfo : Office
     }
   }
 
-  implicit def defaultCaseIdResolution[AA]: AggregateIdResolution[AA] = new AggregateIdResolution[AA]
+  implicit def defaultCaseIdResolution[AA]: AggregateIdResolver[AA] = new AggregateIdResolver[AA]
 
   def ensureActorUnderTestTerminated(actor: ActorRef) = {
     watch(actor)

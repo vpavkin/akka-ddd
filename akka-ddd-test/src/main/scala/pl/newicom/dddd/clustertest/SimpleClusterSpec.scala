@@ -5,7 +5,7 @@ import akka.remote.testconductor.RoleName
 import akka.remote.testkit.{MultiNodeConfig, MultiNodeSpec}
 import akka.testkit.ImplicitSender
 import com.typesafe.config.{ConfigFactory, Config}
-import pl.newicom.dddd.cluster.DefaultShardResolution
+import pl.newicom.dddd.cluster.DefaultShardIdResolver
 
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
@@ -24,7 +24,7 @@ abstract class SimpleClusterSpec(config: Config)
 
   implicit val logger = system.log
 
-  implicit def defaultShardResolution[A] = new DefaultShardResolution[A]
+  implicit def defaultShardResolution[A] = new DefaultShardIdResolver[A](1)
 
   def firstNode: RoleName = roles(0)
   def secondNode: RoleName = roles(1)

@@ -6,7 +6,7 @@ import pl.newicom.dddd.office.OfficeInfo
 
 import scala.concurrent.duration._
 
-class SagaManager(sagaConfig: SagaConfig, sagaOffice: ActorPath) extends Receptor {
+class SagaEventSupply(sagaConfig: SagaConfig, sagaOfficePath: ActorPath) extends Receptor {
   this: EventStreamSubscriber =>
 
   implicit val of = new OfficeInfo[Saga[_, _]] {
@@ -15,12 +15,8 @@ class SagaManager(sagaConfig: SagaConfig, sagaOffice: ActorPath) extends Recepto
   }
 
   lazy val config: ReceptorConfig =
-    ReceptorBuilder().
-      reactTo[Saga[_, _]].
-      propagateTo(sagaOffice)
+    ReceptorConfig.reactTo[Saga[_, _]].propagateTo(sagaOfficePath)
   
   override def redeliverInterval = 30.seconds
   override def warnAfterNumberOfUnconfirmedAttempts = 15
-
-
 }

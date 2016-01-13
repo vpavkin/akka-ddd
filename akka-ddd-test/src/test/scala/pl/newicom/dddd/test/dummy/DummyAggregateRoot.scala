@@ -4,7 +4,7 @@ import java.util.UUID
 
 import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.cluster.DefaultShardResolution
+import pl.newicom.dddd.cluster.DefaultShardIdResolver
 import pl.newicom.dddd.eventhandling.EventPublisher
 import pl.newicom.dddd.office.{OfficeContract, OfficeInfo}
 import pl.newicom.dddd.utils.UUIDSupport
@@ -34,7 +34,7 @@ object DummyAggregateRoot {
       override type ErrorImpl = String
       override type EventImpl = DummyEvent
     }
-    implicit def defaultShardResolution = new DefaultShardResolution[DummyOffice]
+    implicit def defaultShardResolution = new DefaultShardIdResolver[DummyOffice]
   }
 
   sealed trait DummyCommand extends Command {

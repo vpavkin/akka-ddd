@@ -7,8 +7,8 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, WordSpecLike}
 import org.slf4j.LoggerFactory.getLogger
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, CreationSupport}
 import pl.newicom.dddd.aggregate.{Command, EntityId}
-import pl.newicom.dddd.cluster.ShardResolution
-import pl.newicom.dddd.messaging.correlation.AggregateIdResolution
+import pl.newicom.dddd.cluster.ShardIdResolver
+import pl.newicom.dddd.messaging.correlation.AggregateIdResolver
 import pl.newicom.dddd.office.Office._
 import pl.newicom.dddd.office.{LocalOffice, OfficeInfo}
 import pl.newicom.dddd.test.support.OfficeSpec.sys
@@ -26,7 +26,7 @@ object OfficeSpec {
 /**
  * @param shareAggregateRoot if set to true, the same AR instance will be used in all tests, default is false
  */
-abstract class OfficeSpec[A : BusinessEntityActorFactory : OfficeInfo : ShardResolution](_system: Option[ActorSystem] = None, val shareAggregateRoot: Boolean = false)(implicit arClassTag: ClassTag[A])
+abstract class OfficeSpec[A : BusinessEntityActorFactory : OfficeInfo : ShardIdResolver](_system: Option[ActorSystem] = None, val shareAggregateRoot: Boolean = false)(implicit arClassTag: ClassTag[A])
   extends GivenWhenThenTestFixture(_system.getOrElse(sys(arClassTag.runtimeClass))) with WordSpecLike with BeforeAndAfterAll with BeforeAndAfter {
 
   val logger = getLogger(getClass)
@@ -84,7 +84,7 @@ abstract class OfficeSpec[A : BusinessEntityActorFactory : OfficeInfo : ShardRes
     }
   }
 
-  implicit def defaultCaseIdResolution[AA]: AggregateIdResolution[AA] = new AggregateIdResolution[AA]
+  implicit def defaultCaseIdResolution[AA]: AggregateIdResolver[AA] = new AggregateIdResolver[AA]
 
   def ensureActorUnderTestTerminated(actor: ActorRef) = {
     watch(actor)

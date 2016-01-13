@@ -4,7 +4,7 @@ import akka.actor.Props
 import org.scalacheck.Gen
 import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate.AggregateRootActorFactory
-import pl.newicom.dddd.eventhandling.LocalPublisher
+import pl.newicom.dddd.eventhandling.LocalEventPublisher
 import pl.newicom.dddd.test.dummy.DummyAggregateRoot._
 import pl.newicom.dddd.test.support.OfficeSpec
 import pl.newicom.dddd.test.support.TestConfig._
@@ -16,7 +16,7 @@ import scalaz._
 object DummyOfficeWithGenSpec {
   implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[DummyOffice] =
     new AggregateRootActorFactory[DummyOffice] {
-      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
+      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalEventPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 }

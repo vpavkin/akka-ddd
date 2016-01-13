@@ -4,14 +4,14 @@ import akka.actor._
 import akka.persistence.AtLeastOnceDelivery.{UnconfirmedDelivery, UnconfirmedWarning}
 import akka.persistence._
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.delivery.protocol.alod.Delivered
+import pl.newicom.dddd.delivery.protocol.Delivered
 import pl.newicom.dddd.eventhandling.EventPublisher
-import pl.newicom.dddd.messaging.event.{DomainEventMessage, EventMessage}
+import pl.newicom.dddd.messaging.event.{AggregateSnapshotId, DomainEventMessage, EventMessage}
 
 import scala.collection.immutable.Seq
 import scala.concurrent.duration._
 
-trait ReliablePublisher[S, O, Cm <: Command, Ev <: DomainEvent, Er] extends PersistentActor with EventPublisher[Ev] with AtLeastOnceDelivery {
+trait ReliableEventPublisher[S, O, Cm <: Command, Ev <: DomainEvent, Er] extends PersistentActor with EventPublisher[Ev] with AtLeastOnceDelivery {
   this: AggregateRootActor[O, S, Cm, Ev, Er] =>
 
   implicit def system: ActorSystem = context.system
@@ -28,7 +28,7 @@ trait ReliablePublisher[S, O, Cm <: Command, Ev <: DomainEvent, Er] extends Pers
   abstract override def receiveRecover: Receive = {
     case event: EventMessage[Ev] =>
       super.receiveRecover(event)
-      publish(toDomainEventMessage(event))
+      publish(DomainEventMessage(event, AggregateSnapshotId(id, lastSequenceNr)))
 
     case d: Delivered =>
       confirmDelivery(d.deliveryId)

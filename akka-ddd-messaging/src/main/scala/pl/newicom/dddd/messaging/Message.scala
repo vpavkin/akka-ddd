@@ -1,8 +1,9 @@
 package pl.newicom.dddd.messaging
 
 import pl.newicom.dddd.aggregate.EntityId
-import pl.newicom.dddd.delivery.protocol.{Processed, Receipt, alod}
+import pl.newicom.dddd.delivery.protocol.Ack
 import pl.newicom.dddd.messaging.MetaData._
+import pl.newicom.dddd.utils.UUIDSupport.uuid
 
 import scala.reflect.ClassTag
 
@@ -23,26 +24,28 @@ case class MetaData(content: Map[String, Any]) extends Serializable {
   }
 
   def get[B : ClassTag](attrName: String): Option[B] = content.get(attrName).collect { case b: B => b }
-
-  override def toString: String = content.toString()
-
   def isEmpty: Boolean = content.isEmpty
-
   def withDeliveryId(deliveryId: Long): MetaData = copy(content = content + (DeliveryId -> deliveryId))
   def deliveryId: Option[Long] = get[Long](DeliveryId)
   def withCausationId(causationId: EntityId): MetaData = copy(content = content + (CausationId -> causationId))
   def causationId: Option[String] = get[String](CausationId)
+
+  override def toString: String = content.toString()
 }
 
-
-trait Message extends Serializable {
+trait IdentifiedMessage {
   def id: String
+}
+
+trait Message extends IdentifiedMessage with Serializable {
   def metadata: MetaData
 
-  def deliveryReceipt(result: Any = "OK"): Receipt = {
-    deliveryId.map(id => alod.Processed(id, result)).getOrElse(Processed(result))
-  }
+  def ack(result: Any): Ack =
+    metadata.deliveryId.map(deliveryId => Ack.delivered(deliveryId, result)).getOrElse(Ack.processed(uuid, result))
 
-  def deliveryId: Option[Long]
-  def withDeliveryId(deliveryId: Long): Message
+  def withDeliveryId(deliveryId: Long): Message = copyWithMetadata(metadata.withDeliveryId(deliveryId))
+
+  def causedBy(message: IdentifiedMessage): Message = copyWithMetadata(metadata.withCausationId(message.id))
+
+  def copyWithMetadata(metaData: MetaData): Message
 }

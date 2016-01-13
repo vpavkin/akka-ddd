@@ -12,6 +12,7 @@ import pl.newicom.dddd.messaging.event.{AggregateSnapshotId, DomainEventMessage,
 import pl.newicom.dddd.messaging.{Deduplication, Message}
 import pl.newicom.dddd.office.OfficeContract.Aux
 import pl.newicom.dddd.office.{OfficeContract, OfficeInfo}
+import shapeless.{Typeable, TypeCase}
 
 import scala.concurrent.duration.{Duration, _}
 import scala.concurrent.{ExecutionContext, Future}
@@ -60,16 +61,17 @@ abstract class AggregateRootActorFactory {
 object AggregateRootActorFactory {
   def default: AggregateRootActorFactory = new AggregateRootActorFactory {
     override def create[O, S, Cm <: Command, Ev <: DomainEvent, Er](pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])(implicit officeInfo: OfficeInfo[O], contract: Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], cm: ClassTag[Cm]) =
-      new AggregateRootActor[O, S, Cm, Ev, Er](pc, behavior) {}
+      new AggregateRootActor[O, S, Cm, Ev, Er](pc, behavior)
   }
 }
 
-abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
+class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
 (val pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])
-(implicit officeInfo: OfficeInfo[O], contract: OfficeContract.Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], val M: ClassTag[Cm])
-  extends GracefulPassivation with PersistentActor with Stash with ReceivePipeline with Deduplication[CommandMessage, Ev] with ActorLogging {
+(implicit officeInfo: OfficeInfo[O], contract: OfficeContract.Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], val Cm: ClassTag[Cm], caseCMCm: Typeable[CommandMessage[Cm]])
+  extends GracefulPassivation with PersistentActor with Stash with ReceivePipeline with Deduplication[Option[Er]] with ActorLogging {
 
   import AggregateReaction._
+
   implicit def ec: ExecutionContext = context.system.dispatcher
 
   private case class CollaborationResult(reaction: AggregateReaction[Ev, Er])
@@ -77,28 +79,35 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
   private var stateOpt: Option[S] = None
 
   override def persistenceId: String = officeInfo.clerkGlobalId(id)
+
   def id = self.path.name
 
+
+  val CommandMessageCm: TypeCase[CommandMessage[Cm]] = TypeCase[CommandMessage[Cm]]
+  val EventMessageEv: TypeCase[EventMessage[Ev]] = TypeCase[EventMessage[Ev]]
+
   override def receiveRecover = {
-    case em: EventMessage[Ev] => updateState(em)
+    case EventMessageEv(em) => updateState(em)
   }
 
   override def receiveCommand: Receive = {
-    case commandMessage: CommandMessage =>
+    case CommandMessageCm(commandMessage) =>
       log.debug(s"Received: $commandMessage")
       handleCommand(commandMessage)
+    case other => unhandled(other)
   }
 
-  def handleCommand: CommandMessage => Unit = {
-    case cm @ CommandMessage(command: Cm) =>
-      stateOpt.map(state => behavior.processCommand(state)(command))
-        .orElse(behavior.processFirstCommand.lift(command))
-        .map(handleReaction(cm))
-        .getOrElse(unhandled(command))
-    case other => unhandled(other.command)
+  def handleCommand(cm: CommandMessage[Cm]): Unit = {
+    val command = cm.command
+    val reactionOpt = stateOpt.map(state => behavior.processCommand(state)(command))
+      .orElse(behavior.processFirstCommand.lift(command))
+    reactionOpt match {
+      case Some(reaction) => handleReaction(cm)(reaction)
+      case None => unhandled(command)
+    }
   }
 
-  def handleReaction(commandMessage: CommandMessage): AggregateReaction[Ev, Er] => Unit = {
+  def handleReaction(commandMessage: CommandMessage[Cm]): AggregateReaction[Ev, Er] => Unit = {
     case Accept(evt) => accept(commandMessage)(evt)
     case Reject(err) => reject(commandMessage)(err)
     case Collaborate(f) =>
@@ -107,45 +116,45 @@ abstract class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
     case Ignore =>
   }
 
-  def awaitingCollaborationResult(commandMessage: CommandMessage): Receive = {
+  def awaitingCollaborationResult(commandMessage: CommandMessage[Cm]): Receive = {
     case CollaborationResult(reaction) =>
       unstashAll()
       context.unbecome()
       handleReaction(commandMessage)(reaction)
-    case Failure(reason) => throw reason
+    case Failure(reason) =>
+      log.error(reason, "Collaboration failed unexpectedly")
+      unstashAll()
+      context.unbecome()
+      throw reason
     case _ => stash()
   }
 
-  private def accept(command: CommandMessage)(event: Ev) {
+  private def accept(command: CommandMessage[Cm])(event: Ev) {
     persist(EventMessage(event).causedBy(command)) { persisted =>
       log.info("Event persisted: {}", event)
       updateState(persisted)
-      acknowledgeCommand(command)(persisted.event.right)
+      acknowledgeMessage(command)(None)
     }
   }
 
-  private def reject(causedBy: CommandMessage)(err: Er): Unit = {
-    acknowledgeCommand(causedBy)(err.left[Ev])
+  private def reject(command: CommandMessage[Cm])(err: Er): Unit = {
+    acknowledgeMessage(command)(Some(err))
   }
 
   def updateState(persisted: EventMessage[Ev]) {
     val event = persisted.event
     val nextState = stateOpt.map(state => behavior.applyEvent(state)(event)).getOrElse(behavior.applyFirstEvent(event))
     stateOpt = Option(nextState)
-    messageProcessed(persisted.metadata.causationId.get, event)
+    messageProcessed(persisted.metadata.causationId.get, None)
   }
 
-  def toDomainEventMessage(persisted: EventMessage[Ev]): DomainEventMessage[Ev] =
-    DomainEventMessage(persisted, AggregateSnapshotId(id, lastSequenceNr))
 
-  def acknowledgeCommand(commandMessage: CommandMessage)(result: Er \/ Ev) = {
-    val deliveryReceipt = commandMessage.deliveryReceipt(result)
+  def acknowledgeMessage(message: Message)(error: Option[Er]) = {
+    val deliveryReceipt = message.ack(error)
     sender() ! deliveryReceipt
     log.debug(s"Delivery receipt (for received command) sent ($deliveryReceipt)")
   }
 
 
-  override def handleDuplicated(m: CommandMessage, result: Ev): Unit = m match {
-    case cm @ CommandMessage(command: Cm) => acknowledgeCommand(cm)(result.right[Er])
-  }
+  override def handleDuplicated(m: Message, result: Option[Er]): Unit = acknowledgeMessage(m)(result)
 }

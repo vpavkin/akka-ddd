@@ -3,7 +3,7 @@ package pl.newicom.dddd.test.dummy
 import akka.actor.{ActorPath, Props}
 import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.messaging.correlation.EntityIdResolution
+import pl.newicom.dddd.messaging.correlation.EntityIdResolver$
 import pl.newicom.dddd.messaging.event.EventMessage
 import pl.newicom.dddd.office.{OfficePath, OfficeInfo}
 import pl.newicom.dddd.process.EventDecision.Accept
@@ -14,7 +14,7 @@ import shapeless.ops.coproduct.Mapper.Aux
 import shapeless.{Poly1, :+:, CNil}
 object DummySaga {
 
-  implicit def defaultSagaIdResolution[A]: EntityIdResolution[A] = new EntityIdResolution[A]
+  implicit def defaultSagaIdResolution[A]: EntityIdResolver[A] = new EntityIdResolver[A]
 
   implicit object DummySagaActorFactory extends SagaActorFactory[DummySaga] {
     override def props(pc: PassivationConfig): Props = {

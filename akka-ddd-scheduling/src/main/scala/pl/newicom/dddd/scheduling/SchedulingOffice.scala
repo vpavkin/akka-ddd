@@ -3,8 +3,8 @@ package pl.newicom.dddd.scheduling
 import akka.persistence.Recovery
 import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.cluster.ShardResolution
-import pl.newicom.dddd.messaging.correlation.EntityIdResolution
+import pl.newicom.dddd.cluster.ShardIdResolver
+import pl.newicom.dddd.messaging.correlation.EntityIdResolver
 import pl.newicom.dddd.office.OfficeContract.Aux
 import pl.newicom.dddd.office._
 
@@ -23,7 +23,7 @@ object SchedulingOffice {
     override type EventImpl = CommandScheduled
   }
 
-  def open()(implicit eir: EntityIdResolution[SchedulingOffice], sr: ShardResolution[SchedulingOffice], of: OfficeFactory[SchedulingOffice]): OfficePath[SchedulingOffice] = Office.openOffice[SchedulingOffice](SchedulerBehavior, new AggregateRootActorFactory {
+  def open()(implicit eir: EntityIdResolver[SchedulingOffice], sr: ShardIdResolver[SchedulingOffice], of: OfficeFactory[SchedulingOffice]): OfficePath[SchedulingOffice] = Office.openOffice[SchedulingOffice](SchedulerBehavior, new AggregateRootActorFactory {
     override def create[O, S, Cm <: Command, Ev <: DomainEvent, Er](pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])(implicit officeInfo: OfficeInfo[O], contract: Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], cm: ClassTag[Cm]): AggregateRootActor[O, S, Cm, Ev, Er] =
       new AggregateRootActor[O, S, Cm, Ev, Er](pc, behavior) {
         override def recovery = Recovery(toSequenceNr = 0L)

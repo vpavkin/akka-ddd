@@ -1,5 +1,7 @@
 package pl.newicom.eventstore
 
+import java.util.concurrent.TimeUnit
+
 import akka.actor._
 import akka.stream.scaladsl._
 import akka.stream.{FlowShape, ActorMaterializer, OverflowStrategy}
@@ -9,6 +11,8 @@ import eventstore.pipeline.TickGenerator.{Tick, Trigger}
 import pl.newicom.dddd.aggregate.DomainEvent
 import pl.newicom.dddd.messaging.event.EventStreamSubscriber.{InFlightMessagesCallback, EventReceived}
 import pl.newicom.dddd.messaging.event.{EventStream, _}
+
+import scala.concurrent.duration.FiniteDuration
 
 class DemandController(triggerActor: ActorRef, bufferSize: Int, initialDemand: Int = 20) extends InFlightMessagesCallback {
 
@@ -20,7 +24,7 @@ class DemandController(triggerActor: ActorRef, bufferSize: Int, initialDemand: I
 
   private def increaseDemand(increaseValue: Int): Unit =
     for (i <- 1 to increaseValue)
-      triggerActor ! Tick(null)
+      triggerActor ! Tick(FiniteDuration(0, TimeUnit.MILLISECONDS))
 }
 
 trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializationSupport with ActorLogging {

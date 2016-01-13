@@ -1,14 +1,14 @@
 package pl.newicom.dddd.process
 
-import akka.actor.{ActorPath, ActorLogging, Props}
+import akka.actor.{ActorLogging, ActorPath, Props}
 import akka.contrib.pattern.ReceivePipeline
 import akka.persistence.{AtLeastOnceDelivery, PersistentActor, RecoveryCompleted}
-import pl.newicom.dddd.actor.{BusinessEntityActorFactory, GracefulPassivation, PassivationConfig}
+import pl.newicom.dddd.actor.{GracefulPassivation, PassivationConfig}
 import pl.newicom.dddd.aggregate._
-import pl.newicom.dddd.delivery.protocol.alod._
+import pl.newicom.dddd.delivery.protocol.Delivered
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.event.EventMessage
-import pl.newicom.dddd.messaging.{Deduplication, Message}
+import pl.newicom.dddd.messaging.{Deduplication, IdentifiedMessage, Message}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.process.typesafe._
 import shapeless._
@@ -24,9 +24,9 @@ object EventDecision {
 }
 
 trait ReceiveEvent[S] extends Poly with CaseComposition with Decisions {
-  type Case[A] = poly.Case[this.type,  A :: HNil]
+  type Case[A <: DomainEvent] = poly.Case[this.type,  A :: HNil]
 
-  class CaseBuilder[A] {
+  class CaseBuilder[A <: DomainEvent] {
     def apply(fn: ((Option[S], A)) => EventDecision) = new Case[A] {
       override type Result = Option[S] => EventDecision
       val value = (l: A ::HNil) => l match {
@@ -35,14 +35,14 @@ trait ReceiveEvent[S] extends Poly with CaseComposition with Decisions {
     }
   }
 
-  def at[A]
+  def at[A <: DomainEvent]
   = new CaseBuilder[A]
 }
 
 trait ApplyEvent[S] extends Poly with CaseComposition with Reactions[S] {
-  type Case[A] = poly.Case[this.type,  A :: HNil]
+  type Case[A <: DomainEvent] = poly.Case[this.type,  A :: HNil]
 
-  class CaseBuilder[A] {
+  class CaseBuilder[A <: DomainEvent] {
     def apply(fn:  A => Option[S] => EventReaction[S]) = new Case[A] {
       override type Result = Option[S] => EventReaction[S]
       val value = (l: A ::HNil) => l match {
@@ -56,14 +56,14 @@ trait ApplyEvent[S] extends Poly with CaseComposition with Reactions[S] {
     case None => ignore
   }
 
-  def at[A]
+  def at[A <: DomainEvent]
   = new CaseBuilder[A]
 }
 
 trait ResolveId extends Poly with CaseComposition {
-  type Case[A] = poly.Case[this.type,  A :: HNil]
+  type Case[A <: DomainEvent] = poly.Case[this.type,  A :: HNil]
 
-  class CaseBuilder[A] {
+  class CaseBuilder[A <: DomainEvent] {
     def apply(fn:  A => EntityId) = new Case[A] {
       override type Result = EntityId
       val value = (l: A ::HNil) => l match {
@@ -72,7 +72,7 @@ trait ResolveId extends Poly with CaseComposition {
     }
   }
 
-  def at[A]
+  def at[A <: DomainEvent]
   = new CaseBuilder[A]
 }
 
@@ -86,36 +86,28 @@ trait SagaConfig {
 }
 
 object Saga {
-  def props(passivationConfig: PassivationConfig, sagaConfig: SagaConfig)(implicit f1: Folder.Aux[sagaConfig.resolveId.type, sagaConfig.Input, EntityId],
-                                                                          f2: Folder.Aux[sagaConfig.receiveEvent.type, sagaConfig.Input, Option[sagaConfig.State] => EventDecision],
-                                                                          f3: Folder.Aux[sagaConfig.applyEvent.type, sagaConfig.Input, Option[sagaConfig.State] => EventReaction[sagaConfig.State]],
+  def props(passivationConfig: PassivationConfig, sagaConfig: SagaConfig)(implicit
+                                                                          receiveEventFolder: Folder.Aux[sagaConfig.receiveEvent.type, sagaConfig.Input, Option[sagaConfig.State] => EventDecision],
+                                                                          applyEventFolder: Folder.Aux[sagaConfig.applyEvent.type, sagaConfig.Input, Option[sagaConfig.State] => EventReaction[sagaConfig.State]],
                                                                           in: InjectAny[sagaConfig.Input], sct: ClassTag[sagaConfig.State]) = {
     import sagaConfig._
-    Props(new Saga[Input, State](passivationConfig, sagaConfig.name, _.fold(receiveEvent), _.fold(applyEvent)))
+    Props(new Saga[Input, State](passivationConfig, name, in => receiveEventFolder(in), in => applyEventFolder(in)))
   }
+}
+
+case class SagaOfficeInfo[In <: Coproduct, State](name: String) extends OfficeInfo[Saga[In, State]] {
+  override def isSagaOffice: Boolean = true
 }
 
 class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, receiveEvent: In => Option[State] => EventDecision, react: In => Option[State] => EventReaction[State])(implicit In: InjectAny[In], sct: ClassTag[State])
   extends GracefulPassivation with PersistentActor with ReceivePipeline
-    with Deduplication[Message, Unit] with AtLeastOnceDelivery with ActorLogging {
+    with Deduplication[Unit] with AtLeastOnceDelivery with ActorLogging {
 
   override def persistenceId: String = name + "-" + id
 
   def id = self.path.name
 
   var state: Option[State] = None
-
-  private var _lastEventMessage: Option[EventMessage[DomainEvent]] = None
-
-  /**
-   * Event message being processed. Not available during recovery
-   */
-  def lastEventMessage = _lastEventMessage.get
-
-  private [dddd] def deliverMsg(office: ActorPath, msg: Message): Unit = deliver(office)(id => msg.withDeliveryId(id))
-  private [dddd] def deliverCommand(office: ActorPath, command: Command): Unit = deliverMsg(office, CommandMessage(command).causedBy(lastEventMessage))
-
-  def handleDuplicated(m: Message) = acknowledgeMessage(m)
 
   override def receiveCommand: Receive = receiveDeliveryReceipt orElse receiveEventMessage orElse receiveUnexpected
 
@@ -133,7 +125,7 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted => ()
-    case em: EventMessage[DomainEvent] => updateStateWithEvent(em)
+    case em: EventMessage[_] => updateStateWithEvent(em)
     case receipt: Delivered => updateStateWithDeliveryReceipt(receipt)
   }
 
@@ -145,25 +137,14 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
     }
 
 
-  def applyReceipt: PartialFunction[Delivered, Unit] = {
-    case Processed(_, In(in)) => react(in)(state) <| runReaction
-  }
-
   private def updateStateWithEvent(em: EventMessage[DomainEvent]) = {
-    messageProcessed(em)
-    applyEvent(em.event)
+    applyEvent(em)
+    messageProcessed(em.id, ())
   }
 
-  def applyEvent: DomainEvent => Unit = {
-    case In(in) => react(in)(state) <| runReaction
+  private def applyEvent(em: EventMessage[DomainEvent]): Unit = em.event match {
+    case In(in) => react(in)(state) <| runReaction(em)
     case _ => ()
-  }
-
-  def runReaction: EventReaction[State] => Unit = {
-    case ChangeState(newState: State) => state = Some(newState)
-    case Deliver(officePath, command) => deliverCommand(officePath.value, command)
-    case Ignore => ()
-    case And(first, second) => Seq(first, second).foreach(runReaction)
   }
 
   private def updateStateWithDeliveryReceipt(receipt: Delivered) = {
@@ -172,32 +153,35 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
     applyReceipt.applyOrElse(receipt, (e: Delivered) => ())
   }
 
+  private def applyReceipt: PartialFunction[Delivered, Unit] = {
+    case p @ Delivered(_, _, Some(In(in))) => react(in)(state) <| runReaction(p)
+  }
+
+  private def runReaction(causedBy: IdentifiedMessage): EventReaction[State] => Unit = {
+    case ChangeState(newState: State) => state = Some(newState)
+    case Deliver(officePath, command) => deliverCommand(officePath.value, command, causedBy)
+    case Ignore => ()
+    case And(first, second) => Seq(first, second).foreach(runReaction(causedBy))
+  }
+
+  private def deliverCommand(office: ActorPath, command: Command, causedBy: IdentifiedMessage): Unit =
+    deliver(office)(deliveryId => CommandMessage(command).withDeliveryId(deliveryId).causedBy(causedBy))
+
   private def acknowledgeMessage(message: Message) {
-    val deliveryReceipt = message.deliveryReceipt(())
+    val deliveryReceipt = message.ack(())
     sender() ! deliveryReceipt
     log.debug(s"Message [{}] delivery receipt [{}] sent", message, deliveryReceipt)
   }
 
   def receiveUnexpected: Receive = {
-    case em: EventMessage[DomainEvent] => handleUnexpectedEvent(em)
+    case em: EventMessage[_] => handleUnexpectedEvent(em)
   }
 
   def handleUnexpectedEvent(em: EventMessage[DomainEvent]): Unit = {
     log.warning("Unhandled event message: [{}]", em)
   }
 
-
-
-  override implicit def M: ClassManifest[Message] = ???
-
   override def handleDuplicated(m: Message, result: Unit): Unit = acknowledgeMessage(m)
-
-  override def messageProcessed(m: Message): Unit = {
-    _lastEventMessage = Some(m).collect {
-      case em @ EventMessage(_, _) => em
-    }
-    super.messageProcessed(m)
-  }
 
   override def shouldPassivate: Boolean = numberOfUnconfirmed == 0
 }

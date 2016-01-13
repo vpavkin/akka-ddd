@@ -5,10 +5,10 @@ import akka.testkit.TestProbe
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, PassivationConfig}
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.delivery.protocol.Processed
-import pl.newicom.dddd.eventhandling.LocalPublisher
+import pl.newicom.dddd.eventhandling.LocalEventPublisher
 import pl.newicom.dddd.office.LocalOffice._
 import pl.newicom.dddd.process.SagaManagerIntegrationSpec._
-import pl.newicom.dddd.process.SagaSupport.{SagaManagerFactory, registerSaga}
+import pl.newicom.dddd.process.SagaSupport.{SagaEventSupplyFactory, registerSaga}
 import pl.newicom.dddd.persistence.SaveSnapshotRequest
 import pl.newicom.dddd.test.dummy
 import pl.newicom.dddd.test.dummy.DummyAggregateRoot._
@@ -25,7 +25,7 @@ object SagaManagerIntegrationSpec {
 
   implicit def actorFactory(implicit it: Duration = 1.minute): BusinessEntityActorFactory[DummyOffice] =
     new BusinessEntityActorFactory[DummyOffice] {
-      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalPublisher[DummyEvent])
+      override def props(pc: PassivationConfig): Props = Props(new DummyAggregateRoot with LocalEventPublisher[DummyEvent])
       override def inactivityTimeout: Duration = it
     }
 
@@ -47,8 +47,8 @@ class SagaManagerIntegrationSpec extends OfficeSpec[DummyOffice](Some(integratio
 
   implicit lazy val testSagaConfig = new DummySagaConfig(s"${DummyAggregateRoot.DummyOffice.info.name}-$dummyId")
 
-  implicit def sagaManagerFactory[S <: Saga[_, _]]: SagaManagerFactory[S] = (sagaConfig, sagaOffice) => {
-    new SagaManager(sagaConfig, sagaOffice) with EventstoreSubscriber {
+  implicit def sagaManagerFactory[S <: Saga[_, _]]: SagaEventSupplyFactory = (sagaConfig, sagaOffice) => {
+    new SagaEventSupply(sagaConfig, sagaOffice) with EventstoreSubscriber {
       override def redeliverInterval = 1.seconds
       override def receiveCommand: Receive = myReceive.orElse(super.receiveCommand)
 

@@ -6,7 +6,6 @@ import akka.util.Timeout
 import org.scalacheck.Gen
 import pl.newicom.dddd.aggregate.Command
 import pl.newicom.dddd.delivery.protocol.Processed
-import pl.newicom.dddd.messaging.MetaData
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.utils.UUIDSupport._
 
@@ -103,14 +102,14 @@ abstract class GivenWhenThenTestFixture(_system: ActorSystem) extends TestKit(_s
     def expectAck[E](ack: E): Unit = {
       whenFun()
       expectMsgPF[Boolean](timeoutThen.duration) {
-        case Processed(scala.util.Success(`ack`)) => true
+        case Processed(_, scala.util.Success(`ack`)) => true
       }
     }
 
     def expectException[E <: Exception](message: String = null)(implicit t: ClassTag[E]): Unit = {
       whenFun()
       expectMsgPF[Boolean](timeoutThen.duration, hint = s"Failure caused by ${t.runtimeClass.getName} with message $message") {
-        case Processed(scala.util.Failure(ex)) if ex.getClass == t.runtimeClass && (message == null || message == ex.getMessage) => true
+        case Processed(_, scala.util.Failure(ex)) if ex.getClass == t.runtimeClass && (message == null || message == ex.getMessage) => true
       }
     }
 

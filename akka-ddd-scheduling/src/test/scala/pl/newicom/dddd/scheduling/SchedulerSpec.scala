@@ -4,7 +4,7 @@ import akka.actor.Props
 import org.joda.time.DateTime
 import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate.AggregateRootActorFactory
-import pl.newicom.dddd.eventhandling.LocalPublisher
+import pl.newicom.dddd.eventhandling.LocalEventPublisher
 import pl.newicom.dddd.test.support.OfficeSpec
 import pl.newicom.dddd.test.support.TestConfig.testSystem
 import SchedulerSpec._
@@ -15,7 +15,7 @@ object SchedulerSpec {
 
   implicit def actorFactory(implicit it: Duration = 1.minute): AggregateRootActorFactory[SchedulingOffice] =
     new AggregateRootActorFactory[SchedulingOffice] {
-      override def props(pc: PassivationConfig): Props = Props(new SchedulerActor(pc) with LocalPublisher[CommandScheduled])
+      override def props(pc: PassivationConfig): Props = Props(new SchedulerActor(pc) with LocalEventPublisher[CommandScheduled])
       override def inactivityTimeout: Duration = it
     }
 
