@@ -6,7 +6,7 @@ import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.cluster.DefaultShardIdResolver
 import pl.newicom.dddd.eventhandling.EventPublisher
-import pl.newicom.dddd.office.{OfficeContract, OfficeInfo}
+import pl.newicom.dddd.office.{AggregateContract, OfficeInfo}
 import pl.newicom.dddd.utils.UUIDSupport
 
 object DummyAggregateRoot {
@@ -15,10 +15,10 @@ object DummyAggregateRoot {
   // Commands
   //
 
-  trait DummyOfficeContract extends OfficeContract[DummyOffice] {
-    override type CommandImpl = DummyCommand
-    override type ErrorImpl = String
-    override type EventImpl = DummyEvent
+  trait DummyContract extends AggregateContract[DummyOffice] {
+    override type C = DummyCommand
+    override type R = String
+    override type E = DummyEvent
   }
 
 
@@ -29,10 +29,10 @@ object DummyAggregateRoot {
       override def name: String = "Dummy"
     }
 
-    implicit val tc: OfficeContract.Aux[DummyOffice, DummyCommand, DummyEvent, String] = new OfficeContract[DummyOffice] {
-      override type CommandImpl = DummyCommand
-      override type ErrorImpl = String
-      override type EventImpl = DummyEvent
+    implicit val tc: AggregateContract.Aux[DummyOffice, DummyCommand, DummyEvent, String] = new AggregateContract[DummyOffice] {
+      override type C = DummyCommand
+      override type R = String
+      override type E = DummyEvent
     }
     implicit def defaultShardResolution = new DefaultShardIdResolver[DummyOffice]
   }

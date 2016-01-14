@@ -2,8 +2,11 @@ package pl.newicom.dddd.writefront
 
 import akka.actor._
 import akka.cluster.client.{ClusterClientSettings, ClusterClient}
+import pl.newicom.dddd.aggregate.{DomainEvent, Command}
+import pl.newicom.dddd.office.{AggregateContract, OfficeInfo, AggregateOfficeRef}
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 trait GlobalOfficeClientSupport {
   this: Actor =>
@@ -19,8 +22,16 @@ trait GlobalOfficeClientSupport {
     system.actorOf(ClusterClient.props(ClusterClientSettings(system).withInitialContacts(initialContacts.toSet)), "clusterClient")
   }
 
-  def office(officeName: String) =
-    officeClientMap.getOrElseUpdate(officeName, system.actorOf(Props(new OfficeClient(officeName))))
+  trait Office[O] {
+    def apply[C <: Command, E <: DomainEvent, R : ClassTag]()(implicit officeInfo: OfficeInfo[O], contract: AggregateContract.Aux[O, C, E, R]): AggregateOfficeRef[O, C, E, R]
+  }
+
+  def office[O] = new Office[O] {
+    def apply[C <: Command, E <: DomainEvent, R : ClassTag]()(implicit officeInfo: OfficeInfo[O], contract: AggregateContract.Aux[O, C, E, R]): AggregateOfficeRef[O, C, E, R] = {
+      val officeName = officeInfo.name
+      AggregateOfficeRef[O](officeClientMap.getOrElseUpdate(officeName, system.actorOf(Props(new OfficeClient(officeName)))))
+    }
+  }
 
   class OfficeClient(officeName: String) extends Actor {
     override def receive: Receive = {

@@ -9,7 +9,7 @@ import pl.newicom.dddd.actor.{BusinessEntityActorFactory, CreationSupport}
 import pl.newicom.dddd.aggregate.{DomainEvent, AggregateRootBehavior, Command, EntityId}
 import pl.newicom.dddd.messaging.correlation.{EntityIdResolver$, AggregateIdResolver}
 import pl.newicom.dddd.office.Office._
-import pl.newicom.dddd.office.{OfficeFactory, OfficeContract, OfficeInfo}
+import pl.newicom.dddd.office.{OfficeFactory, AggregateContract, OfficeInfo}
 import pl.newicom.dddd.test.support.GivenWhenThenTestFixture
 import pl.newicom.dddd.test.support.OfficeSpec.sys
 import pl.newicom.dddd.utils.UUIDSupport._
@@ -26,7 +26,7 @@ object BehaviorSpec {
  * @param shareAggregateRoot if set to true, the same AR instance will be used in all tests, default is false
  */
 abstract class BehaviorSpec[A : BusinessEntityActorFactory : OfficeInfo : OfficeFactory, S, Cmd <: Command : ClassTag, Evt <: DomainEvent : ClassTag, Err](_system: Option[ActorSystem] = None, val shareAggregateRoot: Boolean = false)
-                                                                                                                                                                               (implicit arClassTag: ClassTag[A], contract: OfficeContract.Aux[A, Cmd, Evt, Err])
+                                                                                                                                                                               (implicit arClassTag: ClassTag[A], contract: AggregateContract.Aux[A, Cmd, Evt, Err])
   extends GivenWhenThenTestFixture(_system.getOrElse(sys(arClassTag.runtimeClass))) with WordSpecLike with BeforeAndAfterAll with BeforeAndAfter {
 
   val logger = getLogger(getClass)

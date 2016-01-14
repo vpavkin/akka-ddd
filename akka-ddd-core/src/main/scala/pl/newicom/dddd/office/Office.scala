@@ -5,7 +5,7 @@ import pl.newicom.dddd.actor.BusinessEntityActorFactory
 import pl.newicom.dddd.aggregate.{AggregateRootActorFactory, AggregateRootBehavior, Command, DomainEvent}
 import pl.newicom.dddd.cluster.ShardIdResolver
 import pl.newicom.dddd.messaging.correlation.EntityIdResolver
-import pl.newicom.dddd.office.OfficeContract.Aux
+import pl.newicom.dddd.office.AggregateContract.Aux
 
 import scala.reflect.ClassTag
 
@@ -15,7 +15,7 @@ object Office {
   }
 
   abstract class OpenOffice[O] {
-    def apply[S, Cmd <: Command : ClassTag, Evt <: DomainEvent : ClassTag, Err](behavior: AggregateRootBehavior[S, Cmd, Evt, Err], factory: AggregateRootActorFactory = AggregateRootActorFactory.default)(implicit contract: OfficeContract.Aux[O, Cmd, Evt, Err], officeInfo: OfficeInfo[O], eir: EntityIdResolver[O], sr: ShardIdResolver[O], of: OfficeFactory[O]): OfficePath[O]
+    def apply[S, Cmd <: Command : ClassTag, Evt <: DomainEvent : ClassTag, Err](behavior: AggregateRootBehavior[S, Cmd, Evt, Err], factory: AggregateRootActorFactory = AggregateRootActorFactory.default)(implicit contract: AggregateContract.Aux[O, Cmd, Evt, Err], officeInfo: OfficeInfo[O], eir: EntityIdResolver[O], sr: ShardIdResolver[O], of: OfficeFactory[O]): OfficePath[O]
   }
 
   def openOffice[O] = new OpenOffice[O] {

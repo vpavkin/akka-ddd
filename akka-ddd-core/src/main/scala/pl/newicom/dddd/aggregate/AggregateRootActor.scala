@@ -10,8 +10,8 @@ import pl.newicom.dddd.eventhandling.EventHandler
 import pl.newicom.dddd.messaging.command.CommandMessage
 import pl.newicom.dddd.messaging.event.{AggregateSnapshotId, DomainEventMessage, EventMessage}
 import pl.newicom.dddd.messaging.{Deduplication, Message}
-import pl.newicom.dddd.office.OfficeContract.Aux
-import pl.newicom.dddd.office.{OfficeContract, OfficeInfo}
+import pl.newicom.dddd.office.AggregateContract.Aux
+import pl.newicom.dddd.office.{AggregateContract, OfficeInfo}
 import shapeless.{Typeable, TypeCase}
 
 import scala.concurrent.duration.{Duration, _}
@@ -30,22 +30,22 @@ object AggregateReaction {
 }
 
 
-trait AggregateRootBehavior[State, CommandImpl <: Command, EventImpl <: DomainEvent, ErrorImpl] {
+trait AggregateRootBehavior[State, C <: Command, E <: DomainEvent, R] {
   import AggregateReaction._
 
-  type CommandProcessingResult = AggregateReaction[EventImpl, ErrorImpl]
-  type ProcessCommand = CommandImpl => CommandProcessingResult
-  type ApplyEvent = EventImpl => State
-  type ProcessFirstCommand = PartialFunction[CommandImpl, CommandProcessingResult]
-  type ApplyFirstEvent = PartialFunction[EventImpl, State]
+  type CommandProcessingResult = AggregateReaction[E, R]
+  type ProcessCommand = C => CommandProcessingResult
+  type ApplyEvent = E => State
+  type ProcessFirstCommand = PartialFunction[C, CommandProcessingResult]
+  type ApplyFirstEvent = PartialFunction[E, State]
 
   def processCommand(state: State): ProcessCommand
   def applyEvent(state: State): ApplyEvent
   def processFirstCommand: ProcessFirstCommand
   def applyFirstEvent: ApplyFirstEvent
 
-  def accept(e: EventImpl): CommandProcessingResult = Accept(e)
-  def reject(e: ErrorImpl): CommandProcessingResult = Reject(e)
+  def accept(e: E): CommandProcessingResult = Accept(e)
+  def reject(e: R): CommandProcessingResult = Reject(e)
   def collaborate(f: ExecutionContext => Future[CommandProcessingResult]): CommandProcessingResult = Collaborate(f)
   def ignore: CommandProcessingResult = Ignore
 }
@@ -53,7 +53,7 @@ trait AggregateRootBehavior[State, CommandImpl <: Command, EventImpl <: DomainEv
 abstract class AggregateRootActorFactory {
   def create[O, S, Cm <: Command, Ev <: DomainEvent, Er]
   (pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])
-  (implicit officeInfo: OfficeInfo[O], contract: OfficeContract.Aux[O, Cm, Ev, Er],  ev: ClassTag[Ev], cm: ClassTag[Cm]): AggregateRootActor[O, S, Cm, Ev, Er]
+  (implicit officeInfo: OfficeInfo[O], contract: AggregateContract.Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], cm: ClassTag[Cm]): AggregateRootActor[O, S, Cm, Ev, Er]
   def inactivityTimeout: Duration = 1.minute
 
 }
@@ -67,7 +67,7 @@ object AggregateRootActorFactory {
 
 class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
 (val pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])
-(implicit officeInfo: OfficeInfo[O], contract: OfficeContract.Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], val Cm: ClassTag[Cm], caseCMCm: Typeable[CommandMessage[Cm]])
+(implicit officeInfo: OfficeInfo[O], contract: AggregateContract.Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], val Cm: ClassTag[Cm], caseCMCm: Typeable[CommandMessage[Cm]])
   extends GracefulPassivation with PersistentActor with Stash with ReceivePipeline with Deduplication[Option[Er]] with ActorLogging {
 
   import AggregateReaction._
@@ -112,8 +112,8 @@ class AggregateRootActor[O, S, Cm <: Command, Ev <: DomainEvent, Er]
     case Reject(err) => reject(commandMessage)(err)
     case Collaborate(f) =>
       context.become(awaitingCollaborationResult(commandMessage), discardOld = false)
-      f(ec).map(CollaborationResult).pipeTo(self)
-    case Ignore =>
+      f(ec).map(CollaborationResult).pipeTo(self)(sender())
+    case Ignore => ()
   }
 
   def awaitingCollaborationResult(commandMessage: CommandMessage[Cm]): Receive = {

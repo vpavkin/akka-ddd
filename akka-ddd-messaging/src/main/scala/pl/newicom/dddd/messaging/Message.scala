@@ -41,7 +41,7 @@ trait Message extends IdentifiedMessage with Serializable {
   def metadata: MetaData
 
   def ack(result: Any): Ack =
-    metadata.deliveryId.map(deliveryId => Ack.delivered(deliveryId, result)).getOrElse(Ack.processed(uuid, result))
+    metadata.deliveryId.map(deliveryId => Ack.delivered(deliveryId, result)).getOrElse(Ack.processed(result))
 
   def withDeliveryId(deliveryId: Long): Message = copyWithMetadata(metadata.withDeliveryId(deliveryId))
 

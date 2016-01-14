@@ -5,7 +5,7 @@ import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate._
 import pl.newicom.dddd.cluster.ShardIdResolver
 import pl.newicom.dddd.messaging.correlation.EntityIdResolver
-import pl.newicom.dddd.office.OfficeContract.Aux
+import pl.newicom.dddd.office.AggregateContract.Aux
 import pl.newicom.dddd.office._
 
 import scala.reflect.ClassTag
@@ -17,10 +17,10 @@ object SchedulingOffice {
     def name: String = "deadlines"
   }
 
-  implicit val contract: OfficeContract.Aux[SchedulingOffice, ScheduleCommand, CommandScheduled, Unit] = new OfficeContract[SchedulingOffice] {
-    override type CommandImpl = ScheduleCommand
-    override type ErrorImpl = Unit
-    override type EventImpl = CommandScheduled
+  implicit val contract: AggregateContract.Aux[SchedulingOffice, ScheduleCommand, CommandScheduled, Unit] = new AggregateContract[SchedulingOffice] {
+    override type C = ScheduleCommand
+    override type R = Unit
+    override type E = CommandScheduled
   }
 
   def open()(implicit eir: EntityIdResolver[SchedulingOffice], sr: ShardIdResolver[SchedulingOffice], of: OfficeFactory[SchedulingOffice]): OfficePath[SchedulingOffice] = Office.openOffice[SchedulingOffice](SchedulerBehavior, new AggregateRootActorFactory {

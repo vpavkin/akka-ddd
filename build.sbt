@@ -48,7 +48,7 @@ lazy val `akka-ddd-write-front` = project
     libraryDependencies ++= Seq(
       Akka.clusterTools, Scalaz.core, Shapeless
     ))
-  .dependsOn(`http-support`)
+  .dependsOn(`http-support`, `akka-ddd-core`)
 
 
 lazy val `view-update` = project
