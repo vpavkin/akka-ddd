@@ -1,7 +1,7 @@
 package pl.newicom.dddd.office
 
 import akka.actor.{ActorRef, ActorSystem}
-import akka.pattern.AskableActorRef
+import akka.pattern.{AskableActorRef, ask}
 import akka.util.Timeout
 import pl.newicom.dddd.aggregate.{DomainEvent, Command}
 import pl.newicom.dddd.delivery.protocol.Processed
@@ -36,7 +36,7 @@ object AggregateOfficeRef {
       override def value: ActorRef = ref
 
       override def ask(command: C)(implicit timeout: Timeout, ec: ExecutionContext): Future[Response[R]] =
-        (new AskableActorRef(ref) ? CommandMessage(command)).mapTo[Processed].map(_.result)
+        (new AskableActorRef(value) ? CommandMessage(command)).mapTo[Processed].map(_.result)
           .map {
             case Some(rejection: R) => Response.rejected(rejection)
             case None => Response.accepted[R]

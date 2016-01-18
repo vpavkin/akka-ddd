@@ -7,3 +7,7 @@ trait OfficeInfo[O] {
   def isSagaOffice: Boolean = false
   def clerkGlobalId(id: EntityId): String = s"$name-$id"
 }
+
+object OfficeInfo {
+  def apply[O](implicit instance: OfficeInfo[O]): OfficeInfo[O] = instance
+}

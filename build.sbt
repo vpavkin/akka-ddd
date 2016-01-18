@@ -36,7 +36,7 @@ lazy val `akka-ddd-core` = project
     scalacOptions ++= Seq("-language:implicitConversions"),
     publishArtifact in Test := true,
     libraryDependencies ++= Seq(
-      Akka.clusterTools, Akka.clusterSharding, Akka.persistence, Akka.contributions, Akka.slf4j, Scalaz.core, Shapeless
+      Akka.clusterTools, Akka.clusterSharding, Akka.persistence, Akka.contributions, Akka.slf4j, Cats, Shapeless
     ))
   .dependsOn(`akka-ddd-messaging`)
 
@@ -46,7 +46,7 @@ lazy val `akka-ddd-write-front` = project
     commonSettings,
     publishArtifact in Test := true,
     libraryDependencies ++= Seq(
-      Akka.clusterTools, Scalaz.core, Shapeless
+      Akka.clusterTools, Cats, Shapeless
     ))
   .dependsOn(`http-support`, `akka-ddd-core`)
 

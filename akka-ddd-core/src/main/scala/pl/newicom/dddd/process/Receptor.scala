@@ -10,29 +10,29 @@ import pl.newicom.dddd.messaging.event._
 import pl.newicom.dddd.messaging.{Message, MetaData}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.persistence.{RegularSnapshotting, RegularSnapshottingConfig}
-import pl.newicom.dddd.process.ReceptorConfig.Transduction
+import pl.newicom.dddd.process.ReceptorConfig.ExtractReceiver
 
-case class ReceptorConfig(eventStream: EventStream, transduction: Transduction)
+case class ReceptorConfig(eventStream: EventStream, transduction: ExtractReceiver)
 
 object ReceptorConfig {
-  type Transduction = PartialFunction[EventMessage[DomainEvent], (ActorPath, Message)]
+  type ExtractReceiver = PartialFunction[EventMessage[DomainEvent], (ActorPath, Message)]
   trait WithoutTransduction {
-    def applyTransduction(transduction: Transduction): ReceptorConfig
-    def propagateTo(receiver: ActorPath): ReceptorConfig = applyTransduction {
+    def extractReceiver(transduction: ExtractReceiver): ReceptorConfig
+
+    def propagateTo(receiver: ActorPath): ReceptorConfig = extractReceiver {
       case any => (receiver, any)
     }
   }
   def reactTo[A : OfficeInfo]: WithoutTransduction = reactTo[A](None)
 
   def reactTo[A : OfficeInfo](clerk: Option[EntityId]): WithoutTransduction = {
-    val officeInfo: OfficeInfo[_] = implicitly[OfficeInfo[_]]
-    val officeName = officeInfo.name
-    val eventStream = clerk.fold[EventStream](OfficeEventStream(officeInfo)) { c => ClerkEventStream(officeName, c) }
+    val officeInfo = OfficeInfo[A]
+    val eventStream = clerk.fold[EventStream](OfficeEventStream(officeInfo)) { c => ClerkEventStream(officeInfo.name, c) }
     reactToStream(eventStream)
   }
 
   def reactToStream(eventStream: EventStream): WithoutTransduction = new WithoutTransduction {
-    override def applyTransduction(transduction: Transduction): ReceptorConfig =
+    override def extractReceiver(transduction: ExtractReceiver): ReceptorConfig =
       ReceptorConfig(eventStream, transduction)
   }
 

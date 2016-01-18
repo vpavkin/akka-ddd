@@ -15,7 +15,6 @@ import shapeless._
 import shapeless.ops.coproduct.Folder
 
 import scala.reflect.ClassTag
-import scalaz.syntax.id._
 
 sealed trait EventDecision
 object EventDecision {
@@ -143,7 +142,9 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
   }
 
   private def applyEvent(em: EventMessage[DomainEvent]): Unit = em.event match {
-    case In(in) => react(in)(state) <| runReaction(em)
+    case In(in) =>
+      val reaction = react(in)(state)
+      runReaction(em)(reaction)
     case _ => ()
   }
 
@@ -154,7 +155,9 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
   }
 
   private def applyReceipt: PartialFunction[Delivered, Unit] = {
-    case p @ Delivered(_, _, Some(In(in))) => react(in)(state) <| runReaction(p)
+    case p @ Delivered(_, _, Some(In(in))) =>
+      val reaction = react(in)(state)
+      runReaction(p)(reaction)
   }
 
   private def runReaction(causedBy: IdentifiedMessage): EventReaction[State] => Unit = {

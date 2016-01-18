@@ -4,9 +4,8 @@ import akka.actor.{ActorPath, ActorRef, Props}
 import pl.newicom.dddd.actor.{BusinessEntityActorFactory, CreationSupport, PassivationConfig}
 import pl.newicom.dddd.aggregate.EntityId
 import pl.newicom.dddd.cluster.ShardIdResolver
-import pl.newicom.dddd.messaging.correlation.{SagaIdResolver, EntityIdResolver}
-import pl.newicom.dddd.messaging.correlation.EntityIdResolver.ResolveEntityId
-import pl.newicom.dddd.office.{Office, OfficeFactory, OfficeInfo}
+import pl.newicom.dddd.messaging.correlation.SagaIdResolver
+import pl.newicom.dddd.office.{Office, OfficeFactory}
 import pl.newicom.dddd.process.typesafe.{EventReaction, InjectAny}
 import shapeless.Coproduct
 import shapeless.ops.coproduct.Folder

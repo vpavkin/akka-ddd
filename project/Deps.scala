@@ -24,6 +24,8 @@ object Deps {
 
     val scalaz                = "7.1.4"
 
+    val cats = "0.3.0"
+
     val shapeless              = "2.2.5"
   }
 
@@ -72,6 +74,8 @@ object Deps {
 
     def apply() = Seq(`slick-for-pg`, connectionPool, testDriver)
   }
+
+  val Cats = "org.spire-math" %% "cats" % Version.cats
 
   object TestFrameworks {
     val scalaTest     = "org.scalatest" %% "scalatest" % Version.ScalaTest

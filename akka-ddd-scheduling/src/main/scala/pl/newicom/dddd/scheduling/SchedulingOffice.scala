@@ -23,7 +23,7 @@ object SchedulingOffice {
     override type E = CommandScheduled
   }
 
-  def open()(implicit eir: EntityIdResolver[SchedulingOffice], sr: ShardIdResolver[SchedulingOffice], of: OfficeFactory[SchedulingOffice]): OfficePath[SchedulingOffice] = Office.openOffice[SchedulingOffice](SchedulerBehavior, new AggregateRootActorFactory {
+  def open()(implicit sr: ShardIdResolver[SchedulingOffice], of: OfficeFactory[SchedulingOffice]): OfficePath[SchedulingOffice] = Office.openOffice[SchedulingOffice](SchedulerBehavior, new AggregateRootActorFactory {
     override def create[O, S, Cm <: Command, Ev <: DomainEvent, Er](pc: PassivationConfig, behavior: AggregateRootBehavior[S, Cm, Ev, Er])(implicit officeInfo: OfficeInfo[O], contract: Aux[O, Cm, Ev, Er], ev: ClassTag[Ev], cm: ClassTag[Cm]): AggregateRootActor[O, S, Cm, Ev, Er] =
       new AggregateRootActor[O, S, Cm, Ev, Er](pc, behavior) {
         override def recovery = Recovery(toSequenceNr = 0L)
