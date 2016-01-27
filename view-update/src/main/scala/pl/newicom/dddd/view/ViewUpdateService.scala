@@ -1,5 +1,6 @@
 package pl.newicom.dddd.view
 
+import akka.{Done, NotUsed}
 import akka.actor.Status.Failure
 import akka.actor.SupervisorStrategy._
 import akka.actor._
@@ -115,12 +116,12 @@ abstract class ViewUpdateService[-E <: DomainEvent, O] extends Actor with Events
             !_.alreadyProcessed
           }.mapAsync(1) { event =>
             handler.handle(toDomainEventMessage(event.eventData), event.eventNr)
-          }.toMat(Sink.ignore)(Keep.right)
+          }.toMat(Sink.ignore)(Keep.right).mapMaterializedValue(_.map(_ => ()))
       )
     }
   }
 
-  def eventSource(esCon: EsConnection, oi: OfficeInfo[O], lastEvtNrOpt: Option[Long]): Source[Event, Unit] = {
+  def eventSource(esCon: EsConnection, oi: OfficeInfo[O], lastEvtNrOpt: Option[Long]): Source[Event, NotUsed] = {
     val streamId = StreamNameResolver.streamId(OfficeEventStream(oi))
     Source.fromPublisher(
       esCon.streamPublisher(

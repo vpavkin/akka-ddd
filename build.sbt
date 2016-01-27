@@ -5,7 +5,7 @@ import java.net.URL
 
 name := "akka-ddd"
 
-version in ThisBuild := "1.0.10-SNAPSHOT"
+version in ThisBuild := "1.0.10-RC1"
 organization in ThisBuild := "pl.newicom.dddd"
 scalaVersion in ThisBuild := "2.11.7"
 
@@ -103,7 +103,7 @@ lazy val `http-support` = project
   .settings(
     commonSettings,
     scalacOptions ++= Seq("-language:implicitConversions"),
-    libraryDependencies ++= Akka.http
+    libraryDependencies ++= Akka.httpAll
   ).dependsOn(`akka-ddd-messaging`)
 
 

@@ -24,7 +24,7 @@ object Response {
 
 abstract class AggregateOfficeRef[O, C <: Command, E <: DomainEvent, R : ClassTag](implicit contract: AggregateContract.Aux[O, C, E, R]) extends Serializable {
   private [dddd] def value: ActorRef
-  def ask(command: C)(implicit timeout: Timeout, ec: ExecutionContext): Future[Response[R]]
+  def process(command: C)(implicit timeout: Timeout, ec: ExecutionContext): Future[Response[R]]
 }
 
 object AggregateOfficeRef {
@@ -35,14 +35,15 @@ object AggregateOfficeRef {
     override def apply[C <: Command, E <: DomainEvent, R : ClassTag](ref: ActorRef)(implicit contract: AggregateContract.Aux[O, C, E, R]): AggregateOfficeRef[O, C, E, R] = new AggregateOfficeRef[O, C, E, R] {
       override def value: ActorRef = ref
 
-      override def ask(command: C)(implicit timeout: Timeout, ec: ExecutionContext): Future[Response[R]] =
-        (new AskableActorRef(value) ? CommandMessage(command)).mapTo[Processed].map(_.result)
+      override def process(command: C)(implicit timeout: Timeout, ec: ExecutionContext): Future[Response[R]] = {
+        (value ? CommandMessage(command)).mapTo[Processed].map(_.result)
           .map {
             case Some(rejection: R) => Response.rejected(rejection)
             case None => Response.accepted[R]
           }.recover {
-            case ex => Response.internalError[R](ex)
-          }
+          case ex => Response.internalError[R](ex)
+        }
+      }
     }
   }
 }

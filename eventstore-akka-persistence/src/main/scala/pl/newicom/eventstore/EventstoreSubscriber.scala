@@ -2,6 +2,7 @@ package pl.newicom.eventstore
 
 import java.util.concurrent.TimeUnit
 
+import akka.NotUsed
 import akka.actor._
 import akka.stream.scaladsl._
 import akka.stream.{FlowShape, ActorMaterializer, OverflowStrategy}
@@ -38,7 +39,7 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
 
   def subscribe(stream: EventStream, fromPosExcl: Option[Long]): InFlightMessagesCallback = {
 
-    def eventSource: Source[EventReceived, Unit] = {
+    def eventSource: Source[EventReceived, NotUsed] = {
       val streamId = StreamNameResolver.streamId(stream)
       log.debug(s"Subscribing to $streamId from position $fromPosExcl (exclusive)")
       Source.fromPublisher(
@@ -53,7 +54,7 @@ trait EventstoreSubscriber extends EventStreamSubscriber with EventstoreSerializ
       }
     }
 
-   def flow: Flow[Trigger, EventReceived, Unit] = Flow.fromGraph(GraphDSL.create() { implicit b =>
+   def flow: Flow[Trigger, EventReceived, NotUsed] = Flow.fromGraph(GraphDSL.create() { implicit b =>
       import GraphDSL.Implicits._
       val zip = b.add(ZipWith(Keep.left[EventReceived, Trigger]))
 
