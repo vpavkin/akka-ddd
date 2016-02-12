@@ -67,6 +67,18 @@ class JsonSerializerExtensionImpl(system: ExtendedActorSystem) extends Extension
     }
     ))
 
+
+  object ActorPathSerializer extends CustomSerializer[ActorPath](format => (
+    {
+      case JString(string) =>
+        val systemName = system.name
+        val path = ActorPath.fromString(string)
+        val updatedString = path.toSerializationFormatWithAddress(Address("akka", systemName))
+        ActorPath.fromString(updatedString)
+    },
+    { case x: ActorPath => JString(x.toSerializationFormat) }
+    ))
+
 }
 
 object JsonSerializerExtension extends ExtensionId[JsonSerializerExtensionImpl] with ExtensionIdProvider {
@@ -76,10 +88,6 @@ object JsonSerializerExtension extends ExtensionId[JsonSerializerExtensionImpl] 
 
 }
 
-object ActorPathSerializer extends CustomSerializer[ActorPath](format => (
-  { case JString(s) => ActorPath.fromString(s) },
-  { case x: ActorPath => JString(x.toSerializationFormat) }
-  ))
 
 class ScheduledEventSerializer extends Serializer[CommandScheduled] {
   val Clazz = classOf[CommandScheduled]
