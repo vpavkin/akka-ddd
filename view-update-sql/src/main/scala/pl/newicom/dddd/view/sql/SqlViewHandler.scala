@@ -2,7 +2,7 @@ package pl.newicom.dddd.view.sql
 
 import com.typesafe.config.Config
 import pl.newicom.dddd.aggregate.DomainEvent
-import pl.newicom.dddd.messaging.event.DomainEventMessage
+import pl.newicom.dddd.messaging.event.{EventMessage, DomainEventMessage}
 import pl.newicom.dddd.view.ViewHandler
 import slick.dbio.DBIOAction.sequence
 import slick.driver.JdbcProfile
@@ -15,7 +15,7 @@ class SqlViewHandler[-E <: DomainEvent, O](override val config: Config, override
 
   private lazy val viewMetadataDao = new ViewMetadataDao
 
-  def handle(eventMessage: DomainEventMessage[E], eventNumber: Long): Future[Unit] =
+  def handle(eventMessage: EventMessage[E], eventNumber: Long): Future[Unit] =
     viewStore.run {
       sequence(vuConfig.projections.map(_.consume(eventMessage))) >>
       viewMetadataDao.insertOrUpdate(viewName, eventNumber)

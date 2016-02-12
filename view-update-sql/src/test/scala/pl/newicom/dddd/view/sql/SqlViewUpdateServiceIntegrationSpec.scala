@@ -7,7 +7,7 @@ import com.typesafe.config.Config
 import pl.newicom.dddd.actor.PassivationConfig
 import pl.newicom.dddd.aggregate.AggregateRootActorFactory
 import pl.newicom.dddd.eventhandling.LocalEventPublisher
-import pl.newicom.dddd.messaging.event.DomainEventMessage
+import pl.newicom.dddd.messaging.event.{EventMessage, DomainEventMessage}
 import pl.newicom.dddd.test.dummy.DummyAggregateRoot.{DummyEvent, CreateDummy, DummyCreated}
 import pl.newicom.dddd.test.dummy.{DummyAggregateRoot, _}
 import pl.newicom.dddd.test.support.IntegrationTestConfig.integrationTestSystem
@@ -63,7 +63,7 @@ class SqlViewUpdateServiceIntegrationSpec
             def failIfRequired(msg: String) =
               if (shouldFail) failed(new RuntimeException(msg)) else successful(())
 
-            def consume(em: DomainEventMessage[pl.newicom.dddd.aggregate.DomainEvent]): ProjectionAction[All] = {
+            def consume(em: EventMessage[pl.newicom.dddd.aggregate.DomainEvent]): ProjectionAction[All] = {
               val event = em.event.asInstanceOf[DummyEvent]
               val ignore = !aggregateId.equals(event.id)
               if (ignore)

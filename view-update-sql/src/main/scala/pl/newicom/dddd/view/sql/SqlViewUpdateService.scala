@@ -1,7 +1,10 @@
 package pl.newicom.dddd.view.sql
 
+import akka.NotUsed
 import eventstore.EsConnection
 import pl.newicom.dddd.aggregate.DomainEvent
+import pl.newicom.dddd.messaging.event.EventSource
+import pl.newicom.dddd.messaging.event.EventSource.EventReceived
 import pl.newicom.dddd.view.{ViewHandler, ViewUpdateService}
 import pl.newicom.dddd.view.ViewUpdateService.ViewUpdateInitiated
 import slick.dbio.DBIO
@@ -10,7 +13,7 @@ import slick.driver.JdbcProfile
 
 import scala.concurrent.Future
 
-abstract class SqlViewUpdateService[E <: DomainEvent, O](implicit val profile: JdbcProfile) extends ViewUpdateService[E, O] with FutureHelpers {
+abstract class SqlViewUpdateService[E <: DomainEvent, O](eventSource: EventSource[EventReceived[E], NotUsed])(implicit val profile: JdbcProfile) extends ViewUpdateService[E, O](eventSource) with FutureHelpers {
   this: SqlViewStoreConfiguration =>
 
   type VUConfig = SqlViewUpdateConfig[E, O]
