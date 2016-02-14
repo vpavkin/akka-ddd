@@ -7,6 +7,7 @@ import pl.newicom.dddd.process.EventDecision
 trait Decisions {
   def ignore: EventDecision = EventDecision.Ignore
   def accept: EventDecision = EventDecision.Accept
+  def reject: EventDecision = EventDecision.Reject
 }
 
 trait Reactions[State] {
