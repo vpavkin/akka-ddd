@@ -20,6 +20,7 @@ sealed trait EventDecision
 object EventDecision {
   case object Accept extends EventDecision
   case object Ignore extends EventDecision
+  case object Reject extends EventDecision
 }
 
 trait ReceiveEvent[S] extends Poly with CaseComposition with Decisions {
@@ -118,7 +119,8 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
     case em @ EventMessage(_, In(msg)) =>
       receiveEvent(msg)(state) match {
         case EventDecision.Accept => raise(em)
-        case EventDecision.Ignore => ()
+        case EventDecision.Ignore => acknowledgeMessage(em)
+        case EventDecision.Reject => ()
       }
   }
 
@@ -150,7 +152,7 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
 
   private def updateStateWithDeliveryReceipt(receipt: Delivered) = {
     confirmDelivery(receipt.deliveryId)
-    log.debug(s"Delivery of message confirmed (receipt: $receipt)")
+    log.debug("Delivery of message confirmed. [{}]", receipt)
     applyReceipt.applyOrElse(receipt, (e: Delivered) => ())
   }
 
