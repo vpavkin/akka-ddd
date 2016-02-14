@@ -3,10 +3,10 @@ import sbt._
 object Deps {
 
   object Version {
-    val Akka                  = "2.4.2-RC1"
+    val Akka                  = "2.4.2-RC3"
 
-    val EventStoreClient      = "2.1.3-SNAPSHOT"
-    val EventStoreAkkaJournal = "2.1.1-SNAPSHOT"
+    val EventStoreClient      = "2.2.2-SNAPSHOT"
+    val EventStoreAkkaJournal = "2.1.2-SNAPSHOT"
 
     val json4s                = "3.3.0"
 
