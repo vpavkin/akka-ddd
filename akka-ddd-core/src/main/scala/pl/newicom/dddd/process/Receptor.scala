@@ -1,15 +1,15 @@
 package pl.newicom.dddd.process
 
-import akka.actor.{Kill, ActorPath}
+import akka.actor.{ActorPath, Kill}
 import akka.contrib.pattern.ReceivePipeline
 import akka.persistence.PersistentActor
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Source, Keep, Sink}
+import akka.stream.scaladsl.{Keep, Sink}
 import pl.newicom.dddd.aggregate.{DomainEvent, EntityId}
-import pl.newicom.dddd.delivery.{AtLeastOnceDeliverySupport, DeliveryState}
-import pl.newicom.dddd.messaging.event.EventSource.{EventReceived, DemandCallback}
+import pl.newicom.dddd.delivery.AtLeastOnceDeliverySupport
+import pl.newicom.dddd.messaging.Message
+import pl.newicom.dddd.messaging.event.DomainEventMessageStream.{DemandCallback, StreamEntry}
 import pl.newicom.dddd.messaging.event._
-import pl.newicom.dddd.messaging.{Message, MetaData}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.persistence.{RegularSnapshotting, RegularSnapshottingConfig}
 import pl.newicom.dddd.process.ReceptorConfig.ExtractReceiver
@@ -45,7 +45,7 @@ trait ReceptorPersistencePolicy extends ReceivePipeline with RegularSnapshotting
   override def journalPluginId = "akka.persistence.journal.inmem"
 }
 
-abstract class Receptor(eventSource: EventSource[EventReceived[DomainEvent], DemandCallback]) extends  AtLeastOnceDeliverySupport with ReceptorPersistencePolicy {
+abstract class Receptor(eventSource: DomainEventMessageStream[DomainEvent, DemandCallback]) extends  AtLeastOnceDeliverySupport with ReceptorPersistencePolicy {
 
   override lazy val persistenceId: String = s"Receptor-${config.eventStream.officeName}-${self.path.hashCode}"
 
@@ -61,7 +61,7 @@ abstract class Receptor(eventSource: EventSource[EventReceived[DomainEvent], Dem
   override def recoveryCompleted(): Unit = {
     log.debug(s"Subscribing to ${config.eventStream} from position $lastSentDeliveryId (exclusive)")
     val callback = eventSource(config.eventStream, lastSentDeliveryId)
-      .toMat(Sink.actorRef[EventReceived[DomainEvent]](self, onCompleteMessage = Kill))(Keep.left)
+      .toMat(Sink.actorRef[StreamEntry[DomainEvent]](self, onCompleteMessage = Kill))(Keep.left)
       .run
     demandCallback = Some(callback)
   }
@@ -73,7 +73,7 @@ abstract class Receptor(eventSource: EventSource[EventReceived[DomainEvent], Dem
     }
 
   def receiveEvent: Receive = {
-    case EventReceived(em, position) =>
+    case StreamEntry(em, position) =>
       config.transduction.lift(em) match {
         case Some((target, msg)) => deliver(target, msg, deliveryId = position)
         case None => deadLetters ! em

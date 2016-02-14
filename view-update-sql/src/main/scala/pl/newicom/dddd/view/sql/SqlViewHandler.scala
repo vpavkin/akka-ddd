@@ -15,7 +15,7 @@ class SqlViewHandler[-E <: DomainEvent, O](override val config: Config, override
 
   private lazy val viewMetadataDao = new ViewMetadataDao
 
-  def handle(eventMessage: EventMessage[E], eventNumber: Long): Future[Unit] =
+  def handle(eventMessage: DomainEventMessage[E], eventNumber: Long): Future[Unit] =
     viewStore.run {
       sequence(vuConfig.projections.map(_.consume(eventMessage))) >>
       viewMetadataDao.insertOrUpdate(viewName, eventNumber)

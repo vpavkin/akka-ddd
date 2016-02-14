@@ -11,7 +11,5 @@ object Projection {
 }
 
 trait Projection[-E <: DomainEvent] extends DBActionHelpers {
-
-  def consume(event: EventMessage[E]): ProjectionAction[All]
-
+  def consume(event: DomainEventMessage[E]): ProjectionAction[All]
 }

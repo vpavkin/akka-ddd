@@ -16,7 +16,7 @@ import pl.newicom.dddd.test.dummy.DummySaga.{DummySagaConfig, EventApplied}
 import pl.newicom.dddd.test.dummy.{DummyAggregateRoot, DummySaga}
 import pl.newicom.dddd.test.support.IntegrationTestConfig.integrationTestSystem
 import pl.newicom.dddd.test.support.OfficeSpec
-import pl.newicom.eventstore.EventstoreSource
+import pl.newicom.eventstore.EventstoreStream$
 import scala.concurrent.duration._
 
 object SagaManagerIntegrationSpec {
@@ -48,7 +48,7 @@ class SagaManagerIntegrationSpec extends OfficeSpec[DummyOffice](Some(integratio
   implicit lazy val testSagaConfig = new DummySagaConfig(s"${DummyAggregateRoot.DummyOffice.info.name}-$dummyId")
 
   implicit def sagaManagerFactory[S <: Saga[_, _]]: SagaEventSupplyFactory = (sagaConfig, sagaOffice) => {
-    new SagaEventSupply(sagaConfig, sagaOffice) with EventstoreSource {
+    new SagaEventSupply(sagaConfig, sagaOffice) with EventstoreStream {
       override def redeliverInterval = 1.seconds
       override def receiveCommand: Receive = myReceive.orElse(super.receiveCommand)
 
@@ -62,7 +62,7 @@ class SagaManagerIntegrationSpec extends OfficeSpec[DummyOffice](Some(integratio
 
   val sagaProbe = TestProbe()
   system.eventStream.subscribe(sagaProbe.ref, classOf[EventApplied])
-  ignoreMsg({ case Processed(_) => true })
+  ignoreMsg({ case Processed(_, _) => true })
 
   "SagaManager" should {
 
