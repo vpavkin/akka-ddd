@@ -57,5 +57,5 @@ case class DomainEventMessage[+E <: DomainEvent](
   override def entityId = aggregateId
   def aggregateId = snapshotId.aggregateId
 
-  override def copyWithMetadata(metaData: MetaData): Message = copy(metadata = metaData)
+  override def copyWithMetadata(metadata: MetaData): Message = copy(metadata = metadata)
 }

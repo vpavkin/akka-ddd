@@ -1,20 +1,18 @@
 package pl.newicom.dddd.view
 
-import akka.{Done, NotUsed}
+import akka.NotUsed
 import akka.actor.Status.Failure
 import akka.actor.SupervisorStrategy._
 import akka.actor._
+import akka.pattern.pipe
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Keep, Source, Sink, RunnableGraph}
-import eventstore.EventNumber.Exact
+import akka.stream.scaladsl.{Keep, RunnableGraph, Sink}
 import eventstore._
 import pl.newicom.dddd.aggregate.DomainEvent
-import pl.newicom.dddd.messaging.event.OfficeEventStream
+import pl.newicom.dddd.messaging.event.{DomainEventMessageStream, OfficeEventStream}
 import pl.newicom.dddd.office.OfficeInfo
 import pl.newicom.dddd.view.ViewUpdateInitializer.ViewUpdateInitException
 import pl.newicom.dddd.view.ViewUpdateService._
-import pl.newicom.eventstore.{StreamNameResolver, EventstoreSerializationSupport}
-import akka.pattern.pipe
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -26,20 +24,12 @@ object ViewUpdateService {
 
   case class ViewUpdateConfigured[O](viewUpdate: ViewUpdate[O])
 
-  object EventReceived {
-    def apply(eventData: EventData, eventNr: Long, lastEventNrOpt: Option[Long]): EventReceived =
-      EventReceived(eventData, eventNr, lastEventNrOpt.exists(eventNr <= _))
-  }
-
-  case class EventReceived(eventData: EventData, eventNr: Long, alreadyProcessed: Boolean)
-
   case class ViewUpdate[O](officeInfo: OfficeInfo[O], lastEventNr: Option[Long], runnable: RunnableGraph[Future[Unit]]) {
     override def toString =  s"ViewUpdate(officeName = ${officeInfo.name}, lastEventNr = $lastEventNr)"
   }
-
 }
 
-abstract class ViewUpdateService[-E <: DomainEvent, O] extends Actor with EventstoreSerializationSupport with ActorLogging {
+abstract class ViewUpdateService[-E <: DomainEvent, O](eventSource: DomainEventMessageStream[E, NotUsed]) extends Actor with ActorLogging {
 
   type VUConfig <: ViewUpdateConfig[O]
 
@@ -105,31 +95,13 @@ abstract class ViewUpdateService[-E <: DomainEvent, O] extends Actor with Events
     val handler = viewHandler(vuConfig)
     val officeInfo = vuConfig.officeInfo
     handler.lastEventNumber.map { lastEvtNrOpt =>
-      ViewUpdate(officeInfo, lastEvtNrOpt,
-        eventSource(esCon, officeInfo, lastEvtNrOpt)
-          .map {
-            case ResolvedEvent(EventRecord(_, _, eventData, _), linkEvent) =>
-              EventReceived(eventData, linkEvent.number.value, lastEvtNrOpt)
-            case unexpected =>
-              throw new RuntimeException(s"Unexpected msg received: $unexpected")
-          }.filter {
-            !_.alreadyProcessed
-          }.mapAsync(1) { event =>
-            handler.handle(toDomainEventMessage(event.eventData), event.eventNr)
-          }.toMat(Sink.ignore)(Keep.right).mapMaterializedValue(_.map(_ => ()))
-      )
+      val graph = eventSource(OfficeEventStream(officeInfo), lastEvtNrOpt)
+        .mapAsync(1) { event =>
+          handler.handle(event.message, event.position)
+        }
+        .toMat(Sink.ignore)(Keep.right)
+        .mapMaterializedValue(_.map(_ => ()))
+      ViewUpdate(officeInfo, lastEvtNrOpt, graph)
     }
   }
-
-  def eventSource(esCon: EsConnection, oi: OfficeInfo[O], lastEvtNrOpt: Option[Long]): Source[Event, NotUsed] = {
-    val streamId = StreamNameResolver.streamId(OfficeEventStream(oi))
-    Source.fromPublisher(
-      esCon.streamPublisher(
-        streamId,
-        lastEvtNrOpt.map(nr => Exact(nr.toInt)),
-        resolveLinkTos = true
-      )
-    )
-  }
-
 }

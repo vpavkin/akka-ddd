@@ -1,13 +1,14 @@
 package pl.newicom.dddd.process
 
 import akka.actor.ActorPath
-import pl.newicom.dddd.messaging.event.EventStreamSubscriber
+import pl.newicom.dddd.aggregate.DomainEvent
+import pl.newicom.dddd.messaging.event.DomainEventMessageStream
+import pl.newicom.dddd.messaging.event.DomainEventMessageStream.DemandCallback
 import pl.newicom.dddd.office.OfficeInfo
 
 import scala.concurrent.duration._
 
-class SagaEventSupply(sagaConfig: SagaConfig, sagaOfficePath: ActorPath) extends Receptor {
-  this: EventStreamSubscriber =>
+class SagaEventSupply(sagaConfig: SagaConfig, sagaOfficePath: ActorPath, eventSource: DomainEventMessageStream[DomainEvent, DemandCallback]) extends Receptor(eventSource) {
 
   implicit val of = new OfficeInfo[Saga[_, _]] {
     override def name: String = sagaConfig.name

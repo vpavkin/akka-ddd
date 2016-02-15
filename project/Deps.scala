@@ -3,6 +3,7 @@ import sbt._
 object Deps {
 
   object Version {
+
     val Akka                  = "2.4.2-RC3"
 
     val EventStoreClient      = "2.2.2-SNAPSHOT"
@@ -32,6 +33,7 @@ object Deps {
     val actor             = apply("actor")
     val http              = apply("http-experimental")
     val httpTestKit       = apply("http-testkit-experimental") % "test"
+    val stream            = apply("stream")
     val httpAll           = Seq(http, httpTestKit)
     val slf4j             = apply("slf4j")
     val persistence       = apply("persistence")

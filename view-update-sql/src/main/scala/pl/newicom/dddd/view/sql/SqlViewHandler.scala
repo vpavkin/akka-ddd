@@ -2,7 +2,7 @@ package pl.newicom.dddd.view.sql
 
 import com.typesafe.config.Config
 import pl.newicom.dddd.aggregate.DomainEvent
-import pl.newicom.dddd.messaging.event.DomainEventMessage
+import pl.newicom.dddd.messaging.event.{EventMessage, DomainEventMessage}
 import pl.newicom.dddd.view.ViewHandler
 import slick.dbio.DBIOAction.sequence
 import slick.driver.JdbcProfile

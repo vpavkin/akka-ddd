@@ -14,7 +14,7 @@ private [dddd] sealed trait EntityIdResolver[A] {
 
 private [dddd] class AggregateIdResolver[A] extends EntityIdResolver[A] {
   override def resolveEntityId: ExtractEntityId = {
-    case cm: CommandMessage[_] => (cm.entityId, cm)
+    case cm: CommandMessage[_] => (cm.command.aggregateId, cm)
   }
 }
 

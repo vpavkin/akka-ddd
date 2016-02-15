@@ -65,9 +65,9 @@ trait EventstoreSerializationSupport {
     DomainEventMessage(em, snapshotId)
   }
 
-  def toEventMessage(eventData: EventData): EventMessage[DomainEvent] = {
+  def toEventMessage[E <: DomainEvent](eventData: EventData): EventMessage[E] = {
     val pr = toPersistentRepr(eventData)
-    pr.payload.asInstanceOf[EventMessage[DomainEvent]]
+    pr.payload.asInstanceOf[EventMessage[E]]
   }
 
   def toPersistentRepr(event: EventData): PersistentRepr = {
