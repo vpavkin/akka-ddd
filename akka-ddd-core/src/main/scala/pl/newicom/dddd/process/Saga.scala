@@ -117,7 +117,9 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
 
   def receiveEventMessage: Receive = {
     case em @ EventMessage(_, In(msg)) =>
-      receiveEvent(msg)(state) match {
+      val decision = receiveEvent(msg)(state)
+      log.info("Saga. State [{}]. Event [{}]. Decision [{}]", state, msg, decision)
+      decision match {
         case EventDecision.Accept => raise(em)
         case EventDecision.Ignore => acknowledgeMessage(em)
         case EventDecision.Reject => ()
@@ -144,8 +146,9 @@ class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, rece
   }
 
   private def applyEvent(em: EventMessage[DomainEvent]): Unit = em.event match {
-    case In(in) =>
-      val reaction = react(in)(state)
+    case In(event) =>
+      val reaction = react(event)(state)
+      log.info("Saga. State [{}]. Event [{}]. Reaction [{}]", state, event, reaction)
       runReaction(em)(reaction)
     case _ => ()
   }
