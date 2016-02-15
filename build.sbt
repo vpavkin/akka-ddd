@@ -5,15 +5,16 @@ import java.net.URL
 
 name := "akka-ddd"
 
-version in ThisBuild := "1.0.10-RC3"
+version in ThisBuild := "1.0.10-RC4"
 
 organization in ThisBuild := "pl.newicom.dddd"
 scalaVersion in ThisBuild := "2.11.7"
 
 scalacOptions     in ThisBuild := Seq("-encoding", "utf8", "-deprecation", "-feature", "-language:postfixOps")
 publishMavenStyle in ThisBuild := true
-homepage          in ThisBuild := Some(new URL("http://github.com/pawelkaczor/akka-ddd"))
-licenses          in ThisBuild := ("Apache2", new URL("http://raw.githubusercontent.com/pawelkaczor/akka-ddd/master/LICENSE.md")) :: Nil
+homepage          in ThisBuild := Some(new URL("http://github.com/notxcain/akka-ddd"))
+licenses          in ThisBuild := ("Apache2", new URL("http://raw.githubusercontent.com/notxcain/akka-ddd/master/LICENSE.md")) :: Nil
+
 
 lazy val root = (project in file("."))
   .aggregate(`akka-ddd-messaging`, `akka-ddd-core`, `akka-ddd-write-front`, `view-update`, `view-update-sql`, `akka-ddd-test`, `eventstore-akka-persistence`, `http-support`, `akka-ddd-scheduling`)

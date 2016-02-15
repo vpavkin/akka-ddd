@@ -97,6 +97,7 @@ class AggregateRootActor[O, S, C <: Command, E <: DomainEvent, R]
     val command = cm.command
     val reactionOpt = stateOpt.map(state => behavior.processCommand(state)(command))
       .orElse(behavior.processFirstCommand.lift(command))
+    log.info("Processed command [{}] with reaction [{}]", command, reactionOpt)
     reactionOpt match {
       case Some(reaction) => handleReaction(cm)(reaction)
       case None => unhandled(command)
