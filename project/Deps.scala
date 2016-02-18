@@ -4,10 +4,10 @@ object Deps {
 
   object Version {
 
-    val Akka                  = "2.4.2-RC3"
+    val Akka                  = "2.4.2"
 
-    val EventStoreClient      = "2.2.2-SNAPSHOT"
-    val EventStoreAkkaJournal = "2.1.2-SNAPSHOT"
+    val EventStoreClient      = "2.2.2-Q"
+    val EventStoreAkkaJournal = "2.1.2-Q"
 
     val json4s                = "3.3.0"
 
@@ -24,7 +24,7 @@ object Deps {
 
     val scalaz                = "7.1.4"
 
-    val cats = "0.3.0"
+    val cats = "0.4.1"
 
     val shapeless              = "2.2.5"
   }
@@ -32,7 +32,7 @@ object Deps {
   object Akka {
     val actor             = apply("actor")
     val http              = apply("http-experimental")
-    val httpTestKit       = apply("http-testkit-experimental") % "test"
+    val httpTestKit       = apply("http-testkit") % "test"
     val stream            = apply("stream")
     val httpAll           = Seq(http, httpTestKit)
     val slf4j             = apply("slf4j")
@@ -76,7 +76,7 @@ object Deps {
     def apply() = Seq(`slick-for-pg`, connectionPool, testDriver)
   }
 
-  val Cats = "org.spire-math" %% "cats" % Version.cats
+  val Cats = "org.typelevel" %% "cats" % Version.cats
 
   object TestFrameworks {
     val scalaTest     = "org.scalatest" %% "scalatest" % Version.ScalaTest
