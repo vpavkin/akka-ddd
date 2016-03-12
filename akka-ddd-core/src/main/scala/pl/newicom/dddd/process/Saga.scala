@@ -99,9 +99,18 @@ case class SagaOfficeInfo[In <: Coproduct, State](name: String) extends OfficeIn
   override def isSagaOffice: Boolean = true
 }
 
-class Saga[In <: Coproduct, State](val pc: PassivationConfig, name: String, receiveEvent: In => Option[State] => EventDecision, react: In => Option[State] => EventReaction[State])(implicit In: InjectAny[In], sct: ClassTag[State])
-  extends GracefulPassivation with PersistentActor with ReceivePipeline
-    with Deduplication[Unit] with AtLeastOnceDelivery with ActorLogging {
+class Saga[In <: Coproduct, State](
+                                    val pc: PassivationConfig,
+                                    name: String,
+                                    receiveEvent: In => Option[State] => EventDecision,
+                                    react: In => Option[State] => EventReaction[State])
+                                  (implicit In: InjectAny[In], sct: ClassTag[State])
+  extends GracefulPassivation
+    with PersistentActor
+    with ReceivePipeline
+    with Deduplication[Unit]
+    with AtLeastOnceDelivery
+    with ActorLogging {
 
   override def persistenceId: String = name + "-" + id
 
