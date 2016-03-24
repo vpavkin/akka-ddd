@@ -1,7 +1,17 @@
-akka-ddd [![Build Status](https://travis-ci.org/pawelkaczor/akka-ddd.svg?branch=master)](https://travis-ci.org/pawelkaczor/akka-ddd) [![Version](https://img.shields.io/maven-central/v/pl.newicom.dddd/akka-ddd-core_2.11.svg?label=version)](http://search.maven.org/#search%7Cga%7C1%7Cg%3Apl.newicom.dddd)
+Typesafe, behavior based fork of [pawelkaczor/akka-ddd](https://github.com/pawelkaczor/akka-ddd)
 ========
 
-[![Join the chat at https://gitter.im/pawelkaczor/akka-ddd](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/pawelkaczor/akka-ddd?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Join the chat at https://gitter.im/notxcain/akka-ddd](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/notxcain/akka-ddd?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
+Main goals compared to original library:
+* Abstract notion of Akka from user API
+* Use pure functional behaviors with late binding
+* Use typesafe libraries like [Circe](https://github.com/travisbrown/circe), [Cats](https://github.com/typelevel/cats) and [Shapeless](https://github.com/milessabin/shapeless), instead of runtime reflection and pattern matching on `Any`.
+* HA using cross-datacenter replication using Cassandra like QUORUM_EACH consistency (not implemented yet)
+
+There is an example project [notxcain/ddd-processing](https://github.com/notxcain/ddd-processing).
+
+### Description below is taken from original library. Some parts of it may be obsolete and/or subject to change.
 
 Reusable artifacts for building applications on top of Akka platform following a [CQRS/DDDD](http://abdullin.com/post/dddd-cqrs-and-other-enterprise-development-buzz-words)-based approach. 
 
