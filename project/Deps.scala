@@ -26,7 +26,7 @@ object Deps {
 
     val cats = "0.4.1"
 
-    val shapeless              = "2.2.5"
+    val shapeless              = "2.3.0"
   }
 
   object Akka {
